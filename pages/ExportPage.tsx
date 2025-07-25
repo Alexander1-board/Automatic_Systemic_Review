@@ -44,6 +44,7 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
   }, [papers, searchLog, duplicateCount]);
 
   const chartRef = useRef<HTMLCanvasElement | null>(null);
+  const chartInstance = useRef<Chart | null>(null);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -53,11 +54,16 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
       acc[p.dbSource] = (acc[p.dbSource] || 0) + 1;
       return acc;
     }, {} as Record<string,number>);
-    new Chart(ctx, {
+    chartInstance.current?.destroy();
+    chartInstance.current = new Chart(ctx, {
       type: 'bar',
       data: { labels: Object.keys(data), datasets: [{ label: 'Included', data: Object.values(data), backgroundColor: '#3b82f6' }] },
       options: { responsive: false }
     });
+    return () => {
+      chartInstance.current?.destroy();
+      chartInstance.current = null;
+    };
   }, [papers]);
 
   const sections = useMemo(() => {
