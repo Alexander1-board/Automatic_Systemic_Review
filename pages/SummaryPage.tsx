@@ -37,7 +37,6 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummari
     }
 
     setIsLoading(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [papers, summaries.length, model]);
 
   useEffect(() => {

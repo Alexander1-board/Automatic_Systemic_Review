@@ -1,14 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ProjectDetails, Paper, Summary, DraftSection, CitationStyle, ExclusionReason } from '../types';
 
-if (!process.env.API_KEY) {
-  // In a real app, you'd want to handle this more gracefully.
-  // For this sandboxed environment, we assume it's available.
-  console.warn("API_KEY environment variable not set. Using a placeholder.");
-  process.env.API_KEY = "YOUR_API_KEY_HERE";
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 const classificationSchema = {
     type: Type.OBJECT,
