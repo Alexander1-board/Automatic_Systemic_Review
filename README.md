@@ -20,3 +20,4 @@ This contains everything you need to run your app locally.
 - Keyboard shortcuts during screening: **K** to keep, **E** to exclude, **Enter** to advance.
 - The app periodically saves a snapshot locally so crashes can be recovered.
 - Use `VITE_USE_WORKERS=true npm run dev` in development to enable workers.
+- If workers fail to start, the app will automatically process AI screening on the main thread.

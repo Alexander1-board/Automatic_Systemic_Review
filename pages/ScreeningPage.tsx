@@ -51,23 +51,29 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
     }
 
     let updatedPapers = [...papers];
-    if (!workerRef.current) {
-      workerRef.current = new Worker(new URL('../workers/classifyWorker.ts', import.meta.url), { type: 'module' });
+    if (!workerRef.current && import.meta.env.VITE_USE_WORKERS) {
+      try {
+        workerRef.current = new Worker(new URL('../workers/classifyWorker.ts', import.meta.url), { type: 'module' });
+      } catch (err) {
+        console.warn('Worker failed, falling back to main thread', err);
+      }
     }
 
-    const worker = workerRef.current;
-
     const classifyWithWorker = (paper: Paper) => {
-      return new Promise<any>(resolve => {
-        const handler = (e: MessageEvent) => {
-          if (e.data.id === paper.id) {
-            worker.removeEventListener('message', handler);
-            resolve(e.data.result);
-          }
-        };
-        worker.addEventListener('message', handler);
-        worker.postMessage({ stage, paper: { id: paper.id, content: stage === 'title' ? paper.title : (paper.abstract || paper.title) }, project: projectDetails, model });
-      });
+      if (workerRef.current) {
+        const worker = workerRef.current;
+        return new Promise<any>(resolve => {
+          const handler = (e: MessageEvent) => {
+            if (e.data.id === paper.id) {
+              worker.removeEventListener('message', handler);
+              resolve(e.data.result);
+            }
+          };
+          worker.addEventListener('message', handler);
+          worker.postMessage({ stage, paper: { id: paper.id, content: stage === 'title' ? paper.title : (paper.abstract || paper.title) }, project: projectDetails, model });
+        });
+      }
+      return classifyPaperPart(stage, stage === 'title' ? paper.title : (paper.abstract || paper.title), projectDetails, model);
     };
 
     for (let i = 0; i < papersToClassify.length; i++) {
@@ -151,8 +157,7 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
     if (currentStage === 'title') return true;
     const prevStage = STAGES[STAGES.indexOf(currentStage) - 1] as ScreeningStage;
     const prevDecision = p[getDecisionField(prevStage)];
-    // Papers move on if they are explicitly kept. Undecided also counts as "not excluded".
-    return prevDecision === ScreeningDecision.KEEP || prevDecision === ScreeningDecision.UNDECIDED || !prevDecision;
+    return prevDecision === ScreeningDecision.KEEP;
   });
 
   const allClassifiedForStage = papersForCurrentStage.every(p => {
