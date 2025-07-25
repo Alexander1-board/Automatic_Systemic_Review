@@ -1,0 +1,6 @@
+{
+  "name": "AutoReview",
+  "description": "A client-side application to automate the systematic review process using the Gemini API, from searching for papers to drafting the final review.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
