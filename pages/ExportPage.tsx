@@ -158,17 +158,19 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
     const included = papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP);
     for (const p of included) {
       const url = p.oaPdfUrl || p.fullTextUrl;
-      if (url && url.endsWith('.pdf')) {
-        try {
-          const resp = await fetch(url);
-          if (resp.ok) {
-            const blob = await resp.blob();
+      if (!url) continue;
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const contentType = resp.headers.get('Content-Type') || '';
+          if (contentType.includes('pdf') || url.toLowerCase().includes('.pdf')) {
             const safeTitle = p.title.replace(/[^a-z0-9]/gi, '_').slice(0, 30);
             zip.file(`${safeTitle}.pdf`, blob);
           }
-        } catch (err) {
-          console.warn('Failed to fetch PDF', err);
         }
+      } catch (err) {
+        console.warn('Failed to fetch PDF', err);
       }
     }
 

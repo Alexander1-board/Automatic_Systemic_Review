@@ -20,7 +20,8 @@ This contains everything you need to run your app locally.
 - A running total of Gemini tokens is shown on the export page diagnostics.
 - Boolean search terms are generated automatically from your description.
 - Downloads include a **Report PDF** or a **ZIP** that bundles the PDF with all
-  available full-text article PDFs.
+  available full-text article PDFs. The ZIP now reliably includes any fetched
+  full-text PDFs alongside the report.
 - Use the "Analysis" and "Report Structure" fields to guide what the summaries and draft should cover.
 - Keyboard shortcuts during screening: **K** to keep, **E** to exclude, **Enter** to advance.
 - The app periodically saves a snapshot locally so crashes can be recovered. A
