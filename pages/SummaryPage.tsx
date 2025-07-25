@@ -10,9 +10,10 @@ interface SummaryPageProps {
   onComplete: () => void;
   onBack: () => void;
   model: string;
+  analysisPlan: string;
 }
 
-const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummaries, onComplete, onBack, model }) => {
+const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummaries, onComplete, onBack, model, analysisPlan }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
@@ -26,7 +27,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummari
     let currentSummaries = [...summaries];
     for(let i=0; i<papersToSummarize.length; i++) {
         const paper = papersToSummarize[i];
-        const summaryData = await generateStructuredSummary(paper, model);
+        const summaryData = await generateStructuredSummary(paper, model, analysisPlan);
         currentSummaries.push({
             paperId: paper.id,
             paperTitle: paper.title,
@@ -111,6 +112,10 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummari
         >
             Back
         </button>
+        <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 text-sm text-primary-600">Re-run Search</button>
         <button onClick={onComplete} disabled={isLoading || summaries.length !== papers.length} className="flex-grow flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-slate-400 disabled:cursor-not-allowed">
           Next: Draft Review
         </button>

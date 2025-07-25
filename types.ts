@@ -29,6 +29,38 @@ export interface ProjectDetails {
   description: string;
   searchTerms: string;
   queryVariants: string[];
+  analysisPlan?: string;
+  reportStructure?: string;
+  useUnpaywall?: boolean;
+  useOpenAlt?: boolean;
+  searchProfiles?: SearchProfile[];
+  activeProfileId?: string;
+  sourceFilters?: Record<string, SourceSetting>;
+}
+
+export interface SourceSetting {
+  enabled: boolean;
+  yearFrom?: number;
+  yearTo?: number;
+  language?: string;
+  docType?: string;
+}
+
+export interface SearchParams {
+  query: string;
+  limit?: number;
+  yearFrom?: number;
+  yearTo?: number;
+  language?: string;
+  docType?: string;
+  cursor?: string;
+}
+
+export interface SearchProfile {
+  id: string;
+  name: string;
+  searchTerms: string;
+  sourceFilters: Record<string, SourceSetting>;
 }
 
 export interface Paper {
@@ -72,13 +104,15 @@ export interface Summary {
   conclusions: string;
 }
 
-export enum DraftSection {
-  INTRODUCTION = "Introduction",
-  METHODS = "Methods",
-  RESULTS = "Results",
-  DISCUSSION = "Discussion",
-  ABSTRACT = "Abstract",
-}
+export const DefaultDraftSections = [
+  'Introduction',
+  'Methods',
+  'Results',
+  'Discussion',
+  'Abstract',
+] as const;
+
+export type DraftSection = typeof DefaultDraftSections[number] | string;
 
 export enum CitationStyle {
     APA = "APA",
@@ -91,6 +125,16 @@ export interface SearchLogEntry {
     query: string;
     hits: number;
     date: string; // ISO String
+}
+
+export interface GeminiLogEntry {
+    timestamp: string;
+    action: string;
+    stage?: string;
+    paperId?: string;
+    ms?: number;
+    error?: string;
+    tokens?: number;
 }
 
 export interface PrismaCounts {

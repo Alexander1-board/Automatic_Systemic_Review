@@ -6,7 +6,14 @@ export const calculatePrismaCounts = (
     duplicateCount: number
 ): PrismaCounts => {
     
-    const identification = searchLog.map(log => ({ db: log.database, hits: log.hits }));
+    let identification = searchLog.map(log => ({ db: log.database, hits: log.hits }));
+    if (identification.length === 0) {
+        const dbMap = papers.reduce((acc: Record<string, number>, p) => {
+            if (p.dbSource) acc[p.dbSource] = (acc[p.dbSource] || 0) + 1;
+            return acc;
+        }, {});
+        identification = Object.keys(dbMap).map(db => ({ db, hits: dbMap[db] }));
+    }
     
     const recordsScreened = papers.length;
 

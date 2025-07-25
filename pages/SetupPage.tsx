@@ -3,11 +3,15 @@ import { SparklesIcon } from '../components/Icons';
 
 interface SetupPageProps {
   onComplete: () => void;
+  onResume?: () => void;
+  hasSnapshot?: boolean;
   model: string;
   setModel: (model: string) => void;
+  testing: boolean;
+  setTesting: (val: boolean) => void;
 }
 
-const SetupPage: React.FC<SetupPageProps> = ({ onComplete, model, setModel }) => {
+const SetupPage: React.FC<SetupPageProps> = ({ onComplete, onResume, hasSnapshot, model, setModel, testing, setTesting }) => {
   const availableModels = ['gemini-2.5-pro', 'gemini-2.5-flash'];
 
   return (
@@ -39,14 +43,34 @@ const SetupPage: React.FC<SetupPageProps> = ({ onComplete, model, setModel }) =>
                 Select the AI model to power your review.
               </p>
             </div>
-          </div>
-          <div className="pt-4">
+        </div>
+        <div>
+          <label className="inline-flex items-center mt-2">
+            <input
+              type="checkbox"
+              className="h-4 w-4 text-primary-600 border-gray-300 rounded"
+              checked={testing}
+              onChange={e => setTesting(e.target.checked)}
+            />
+            <span className="ml-2 text-sm text-slate-700 dark:text-primary-300" title="Maximum of 10 papers per source after duplicates are removed">Testing mode (limit results to 10)</span>
+          </label>
+        </div>
+        
+        <div className="pt-4 space-y-2">
             <button
               onClick={onComplete}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
             >
               Next: Define Project
             </button>
+            {hasSnapshot && onResume && (
+              <button
+                onClick={onResume}
+                className="w-full flex justify-center py-2 px-4 border border-primary-600 rounded-md shadow-sm text-sm font-medium text-primary-700 bg-white hover:bg-slate-50 dark:bg-primary-800 dark:text-primary-200 dark:border-primary-600"
+              >
+                Resume Previous Session
+              </button>
+            )}
           </div>
         </div>
       </div>

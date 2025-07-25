@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { ProjectDetails, Paper, Summary, DraftSection, CitationStyle, ExclusionReason } from '../types';
+import { ProjectDetails, Paper, Summary, DraftSection, CitationStyle, ExclusionReason, GeminiLogEntry } from '../types';
 
 if (!process.env.API_KEY) {
   // In a real app, you'd want to handle this more gracefully.
@@ -9,6 +9,23 @@ if (!process.env.API_KEY) {
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+const LOG_KEY = 'gemini_logs';
+const logGemini = (entry: GeminiLogEntry) => {
+    try {
+        const logs: GeminiLogEntry[] = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+        logs.push(entry);
+        localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+        window.dispatchEvent(new Event('geminiLog'));
+    } catch (err) {
+        console.warn('Failed to write Gemini log', err);
+    }
+};
+
+const estimateTokens = (text: string) => {
+    if (!text) return 0;
+    return Math.ceil(text.trim().split(/\s+/).length);
+};
 
 const classificationSchema = {
     type: Type.OBJECT,
@@ -49,7 +66,7 @@ const strategySchema = {
         },
         recommendedDatabases: {
             type: Type.ARRAY,
-            items: { type: Type.STRING, enum: ["PubMed", "Crossref", "OpenAlex"] },
+            items: { type: Type.STRING, enum: ["PubMed", "Crossref", "OpenAlex", "arXiv", "SemanticScholar", "ERIC", "BASE", "NASA ADS", "DataCite", "WHO GIM/LILACS", "DBLP"] },
             description: "A list of recommended databases from the available options based on topic relevance."
         }
     },
@@ -69,6 +86,7 @@ export const classifyPaperPart = async (part: 'title' | 'abstract' | 'full-text'
         Should this paper be included or excluded? Provide a confidence score and a brief justification.
     `;
 
+    const start = performance.now();
     try {
         const response = await ai.models.generateContent({
             model: modelName,
@@ -79,9 +97,14 @@ export const classifyPaperPart = async (part: 'title' | 'abstract' | 'full-text'
             }
         });
         const jsonText = response.text.trim();
-        return JSON.parse(jsonText);
-    } catch (error) {
+        const result = JSON.parse(jsonText);
+        const tokens = estimateTokens(prompt) + estimateTokens(jsonText);
+        logGemini({ timestamp: new Date().toISOString(), action: 'classify', stage: part, ms: performance.now() - start, tokens });
+        return result;
+    } catch (error: any) {
         console.error(`Error classifying paper ${part}:`, error);
+        const tokens = estimateTokens(prompt);
+        logGemini({ timestamp: new Date().toISOString(), action: 'classify', stage: part, ms: performance.now() - start, error: error?.message || String(error), tokens });
         return { decision: 'exclude', confidence: 0, justification: 'Error during analysis.' };
     }
 };
@@ -94,7 +117,7 @@ export const developSearchStrategy = async (
     const prompt = `
         Act as an expert systematic review researcher. Your task is to develop a comprehensive search strategy based on the user's input.
         
-        Available databases for searching are: "PubMed", "Crossref", "OpenAlex".
+        Available databases for searching are: "PubMed", "Crossref", "OpenAlex", "arXiv", "SemanticScholar", "ERIC", "BASE", "NASA ADS", "DataCite", "WHO GIM/LILACS", "DBLP".
 
         User's input:
         - Research Question/Description: "${description}"
@@ -106,6 +129,7 @@ export const developSearchStrategy = async (
         3.  Refine and expand the user's initial boolean terms. Incorporate relevant synonyms and controlled vocabulary (like MeSH for biomedical topics) to create a single, robust, and finalized boolean query string. This query should be optimized for searching academic databases.
         4.  List the key synonyms or variants you identified.
     `;
+    const start = performance.now();
     try {
         const response = await ai.models.generateContent({
             model: modelName,
@@ -116,26 +140,31 @@ export const developSearchStrategy = async (
             }
         });
         const jsonText = response.text.trim();
+        const tokens = estimateTokens(prompt) + estimateTokens(jsonText);
+        logGemini({ timestamp: new Date().toISOString(), action: 'strategy', ms: performance.now() - start, tokens });
         return JSON.parse(jsonText);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error developing search strategy:", error);
+        logGemini({ timestamp: new Date().toISOString(), action: 'strategy', ms: performance.now() - start, error: error?.message || String(error) });
         return {
             suggestedTitle: "Error: Could not generate title",
             finalizedQuery: termSuggestions,
             queryVariants: [],
-            recommendedDatabases: ["PubMed", "Crossref", "OpenAlex"]
+            recommendedDatabases: ["PubMed", "Crossref", "OpenAlex", "arXiv", "SemanticScholar", "ERIC", "BASE", "NASA ADS", "DataCite", "WHO GIM/LILACS", "DBLP"]
         };
     }
 };
 
 
-export const generateStructuredSummary = async (paper: Paper, modelName: string): Promise<Omit<Summary, 'paperId' | 'paperTitle'>> => {
+export const generateStructuredSummary = async (paper: Paper, modelName: string, focus?: string): Promise<Omit<Summary, 'paperId' | 'paperTitle'>> => {
     const prompt = `
         Generate a structured summary of the following paper's abstract. If abstract is empty, use the title.
         Title: "${paper.title}"
         Abstract: "${paper.abstract}"
         Focus on these four areas: Methodology, Key Findings, Research Context, and Conclusions.
+        ${focus ? `Pay particular attention to ${focus}.` : ''}
     `;
+    const start = performance.now();
     try {
         const response = await ai.models.generateContent({
             model: modelName,
@@ -146,41 +175,52 @@ export const generateStructuredSummary = async (paper: Paper, modelName: string)
             }
         });
         const jsonText = response.text.trim();
+        const tokens = estimateTokens(prompt) + estimateTokens(jsonText);
+        logGemini({ timestamp: new Date().toISOString(), action: 'summary', paperId: paper.id, ms: performance.now() - start, tokens });
         return JSON.parse(jsonText);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error generating structured summary:", error);
+        const tokens = estimateTokens(prompt);
+        logGemini({ timestamp: new Date().toISOString(), action: 'summary', paperId: paper.id, ms: performance.now() - start, error: error?.message || String(error), tokens });
         return { methodology: 'Error', keyFindings: 'Error', researchContext: 'Error', conclusions: 'Error' };
     }
 };
 
-export const generateDraftSection = async (section: DraftSection, content: string | Summary[], modelName: string): Promise<string> => {
+export const generateDraftSection = async (section: DraftSection, content: string | Summary[], modelName: string, focus?: string): Promise<string> => {
     let prompt;
-    switch(section) {
-        case DraftSection.INTRODUCTION:
+    switch(section.toLowerCase()) {
+        case 'introduction':
             prompt = `Write a compelling introduction for a systematic review titled "${content}". Lay out the research context and state the primary objectives.`;
             break;
-        case DraftSection.METHODS:
-            prompt = `Based on the following summaries, write a 'Methods' section for a systematic review. Describe the search strategy, inclusion/exclusion criteria, and data extraction process. The summaries are:\n\n${JSON.stringify(content)}`;
+        case 'methods':
+            prompt = `Based on the following summaries, write a 'Methods' section for a systematic review. Describe the search strategy, inclusion/exclusion criteria, and data extraction process. ${focus ? `Give special consideration to ${focus}.` : ''} The summaries are:\n\n${JSON.stringify(content)}`;
             break;
-        case DraftSection.RESULTS:
-            prompt = `Synthesize the 'Key Findings' from the following paper summaries into a coherent 'Results' section. Group findings thematically if possible.\n\n${JSON.stringify(content)}`;
+        case 'results':
+            prompt = `Synthesize the 'Key Findings' from the following paper summaries into a coherent 'Results' section. Group findings thematically if possible. ${focus ? `Highlight aspects related to ${focus}.` : ''}\n\n${JSON.stringify(content)}`;
             break;
-        case DraftSection.DISCUSSION:
-            prompt = `Write a 'Discussion' section based on the following summaries. Interpret the results, discuss implications, mention limitations, and suggest future research directions.\n\n${JSON.stringify(content)}`;
+        case 'discussion':
+            prompt = `Write a 'Discussion' section based on the following summaries. Interpret the results, discuss implications, mention limitations, and suggest future research directions. ${focus ? `Discuss how the findings relate to ${focus}.` : ''}\n\n${JSON.stringify(content)}`;
             break;
-        case DraftSection.ABSTRACT:
+        case 'abstract':
              prompt = `Write a structured abstract (Background, Methods, Results, Conclusion) for a systematic review. The main content is as follows:\n\n${content}`;
              break;
+        default:
+             prompt = `Write the section titled '${section}' for a systematic review using the following content:\n\n${typeof content === 'string' ? content : JSON.stringify(content)}`;
     }
-    
+
     try {
+        const start = performance.now();
         const response = await ai.models.generateContent({
             model: modelName,
             contents: prompt,
         });
+        const tokens = estimateTokens(prompt) + estimateTokens(response.text);
+        logGemini({ timestamp: new Date().toISOString(), action: 'draft', stage: section, ms: performance.now() - start, tokens });
         return response.text;
-    } catch (error) {
+    } catch (error: any) {
         console.error(`Error generating draft for ${section}:`, error);
+        const tokens = estimateTokens(prompt);
+        logGemini({ timestamp: new Date().toISOString(), action: 'draft', stage: section, ms: performance.now() - start, error: error?.message || String(error), tokens });
         return `Error generating content for ${section}.`;
     }
 };
@@ -194,14 +234,19 @@ export const generateCitations = async (papers: Paper[], style: CitationStyle, m
         ${JSON.stringify(paperData, null, 2)}
     `;
 
+    const start = performance.now();
     try {
         const response = await ai.models.generateContent({
             model: modelName,
             contents: prompt,
         });
+        const tokens = estimateTokens(prompt) + estimateTokens(response.text);
+        logGemini({ timestamp: new Date().toISOString(), action: 'citations', ms: performance.now() - start, tokens });
         return response.text;
-    } catch (error) {
+    } catch (error: any) {
         console.error(`Error generating citations for style ${style}:`, error);
+        const tokens = estimateTokens(prompt);
+        logGemini({ timestamp: new Date().toISOString(), action: 'citations', ms: performance.now() - start, error: error?.message || String(error), tokens });
         return `Error generating citations.`;
     }
 }

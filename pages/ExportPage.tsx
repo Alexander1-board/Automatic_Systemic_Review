@@ -1,49 +1,88 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { Paper, DraftSection, CitationStyle, SearchLogEntry, PrismaCounts, ScreeningDecision } from '../types';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { Chart, BarController, BarElement, CategoryScale, LinearScale } from 'chart.js';
+import JSZip from 'jszip';
+import { jsPDF } from 'jspdf';
+import { Paper, CitationStyle, SearchLogEntry, PrismaCounts, ScreeningDecision, DefaultDraftSections } from '../types';
 import { generateCitations } from '../services/geminiService';
 import { calculatePrismaCounts } from '../utils/prismaUtils';
 import PrismaDiagram from '../components/PrismaDiagram';
 
+Chart.register(BarController, BarElement, CategoryScale, LinearScale);
+
 interface ExportPageProps {
   papers: Paper[];
   searchLog: SearchLogEntry[];
-  draft: Record<DraftSection, string>;
+  draft: Record<string, string>;
   projectTitle: string;
+  reportStructure: string;
   onBack: () => void;
   model: string;
   duplicateCount: number;
 }
 
-const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, projectTitle, onBack, model, duplicateCount }) => {
+const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, projectTitle, reportStructure, onBack, model, duplicateCount }) => {
   const [citationStyle, setCitationStyle] = useState<CitationStyle>(CitationStyle.APA);
   const [citations, setCitations] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [autoExport, setAutoExport] = useState(false);
+
+  const diagnostics = useMemo(() => {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('timing_'));
+    const dbStats = keys.map(k => {
+      const arr = JSON.parse(localStorage.getItem(k) || '[]');
+      const avg = arr.reduce((a:number,b:number)=>a+b,0) / (arr.length || 1);
+      return { db: k.replace('timing_',''), avg };
+    });
+    const aiLogs = JSON.parse(localStorage.getItem('gemini_logs') || '[]');
+    const aiCount = aiLogs.length;
+    const aiAvg = aiLogs.reduce((a:any,b:any)=>a+(b.ms||0),0) / (aiCount || 1);
+    const tokenTotal = aiLogs.reduce((a:any,b:any)=>a+(b.tokens||0),0);
+    return [...dbStats, { db: 'Gemini calls', avg: aiAvg, count: aiCount, tokens: tokenTotal }];
+  }, []);
 
   const prismaCounts: PrismaCounts = useMemo(() => {
     return calculatePrismaCounts(papers, searchLog, duplicateCount);
   }, [papers, searchLog, duplicateCount]);
 
-  const fullText = `
-# ${projectTitle}
+  const chartRef = useRef<HTMLCanvasElement | null>(null);
+  const chartInstance = useRef<Chart | null>(null);
 
-## Abstract
-${draft.Abstract}
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const ctx = chartRef.current.getContext('2d');
+    if (!ctx) return;
+    const data = papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP).reduce((acc:any,p) => {
+      acc[p.dbSource] = (acc[p.dbSource] || 0) + 1;
+      return acc;
+    }, {} as Record<string,number>);
+    chartInstance.current?.destroy();
+    chartInstance.current = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: Object.keys(data), datasets: [{ label: 'Included', data: Object.values(data), backgroundColor: '#3b82f6' }] },
+      options: { responsive: false }
+    });
+    return () => {
+      chartInstance.current?.destroy();
+      chartInstance.current = null;
+    };
+  }, [papers]);
 
-## Introduction
-${draft.Introduction}
+  const sections = useMemo(() => {
+    const lines = (reportStructure || DefaultDraftSections.join('\n'))
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    return lines.length > 0 ? lines : [...DefaultDraftSections];
+  }, [reportStructure]);
 
-## Methods
-${draft.Methods}
-
-## Results
-${draft.Results}
-
-## Discussion
-${draft.Discussion}
-
-## References
-${citations}
-  `.trim();
+  const fullText = useMemo(() => {
+    const parts = [`# ${projectTitle}`];
+    sections.forEach(sec => {
+      parts.push(`## ${sec}`, draft[sec] || '');
+    });
+    parts.push('## References', citations);
+    return parts.join('\n\n').trim();
+  }, [projectTitle, sections, draft, citations]);
 
   const handleGenerateCitations = useCallback(async () => {
     const papersToCite = papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP);
@@ -63,15 +102,86 @@ ${citations}
     }
   }, [papers, citationStyle, model]);
   
-  const downloadAsTxt = () => {
-    const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${projectTitle.replace(/\s+/g, '_')}_review.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const createPdfDoc = () => {
+    const doc = new jsPDF();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text(projectTitle, 10, 20);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    let y = 30;
+    sections.forEach(sec => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      if (y > 280) { doc.addPage(); y = 20; }
+      doc.text(sec, 10, y);
+      y += 8;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      const lines = doc.splitTextToSize(draft[sec] || '', 180);
+      lines.forEach(t => {
+        if (y > 280) { doc.addPage(); y = 20; }
+        doc.text(t, 10, y);
+        y += 7;
+      });
+      y += 4;
+    });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    if (y > 280) { doc.addPage(); y = 20; }
+    doc.text('References', 10, y);
+    y += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.splitTextToSize(citations || '', 180).forEach(t => {
+      if (y > 280) { doc.addPage(); y = 20; }
+      doc.text(t, 10, y);
+      y += 7;
+    });
+    return doc;
+  };
+
+  const downloadAsPDF = () => {
+    const doc = createPdfDoc();
+    doc.save(`${projectTitle.replace(/\s+/g, '_')}_review.pdf`);
+  };
+
+  const generatePdfBlob = () => {
+    const doc = createPdfDoc();
+    return doc.output('blob');
+  };
+
+  const downloadZip = async () => {
+    const zip = new JSZip();
+    zip.file('review.pdf', generatePdfBlob());
+
+    const included = papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP);
+    for (const p of included) {
+      const url = p.oaPdfUrl || p.fullTextUrl;
+      if (!url) continue;
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const contentType = resp.headers.get('Content-Type') || '';
+          if (contentType.includes('pdf') || url.toLowerCase().includes('.pdf')) {
+            const safeTitle = p.title.replace(/[^a-z0-9]/gi, '_').slice(0, 30);
+            zip.file(`${safeTitle}.pdf`, blob);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch PDF', err);
+      }
+    }
+
+    const content = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectTitle.replace(/\s+/g, '_')}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
   
@@ -92,6 +202,13 @@ ${citations}
     URL.revokeObjectURL(url);
   }
 
+  useEffect(() => {
+    if (autoExport && citations) {
+      downloadAsPDF();
+      downloadSearchLog();
+    }
+  }, [autoExport, citations]);
+
   return (
     <div className="space-y-8">
       <div className="bg-white dark:bg-primary-900 p-8 rounded-lg shadow-lg border border-slate-200 dark:border-primary-700">
@@ -110,6 +227,7 @@ ${citations}
           </div>
           <div className="mt-6 p-4 flex justify-center bg-slate-50 dark:bg-black rounded-lg">
             <PrismaDiagram counts={prismaCounts} />
+            <canvas id="sourceChart" className="ml-8" width="300" height="200" ref={chartRef}></canvas>
           </div>
       </div>
       
@@ -170,10 +288,14 @@ ${citations}
             <textarea readOnly value={citations} rows={10} className="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 dark:bg-primary-950 dark:border-primary-700 shadow-sm sm:text-sm" placeholder="Generated citations will appear here..."/>
             <div>
               <h3 className="text-lg font-semibold">Download</h3>
-              <p className="text-sm text-slate-500 dark:text-primary-400 mt-1">Download the complete review as a text file.</p>
-              <button onClick={downloadAsTxt} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                  Download .txt
+              <p className="text-sm text-slate-500 dark:text-primary-400 mt-1">Download the complete review.</p>
+              <button onClick={downloadAsPDF} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                  Download Report as PDF
               </button>
+              <button onClick={downloadZip} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">Download ZIP with Full Text PDFs</button>
+              <label className="mt-2 flex items-center text-sm">
+                <input type="checkbox" className="mr-2" checked={autoExport} onChange={e => setAutoExport(e.target.checked)} /> Auto-export on finish
+              </label>
             </div>
           </div>
           <div className="md:col-span-2">
@@ -183,6 +305,16 @@ ${citations}
               </div>
           </div>
         </div>
+        {diagnostics.length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold">Diagnostics</h3>
+            <ul className="mt-2 text-sm list-disc pl-6">
+              {diagnostics.map(d => (
+                <li key={d.db}>{d.db}: avg {d.avg.toFixed(0)} ms{d.count !== undefined ? ` (${d.count} calls)` : ''}{d.tokens !== undefined ? `, ${d.tokens} tokens` : ''}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
