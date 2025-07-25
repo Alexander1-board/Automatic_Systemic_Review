@@ -22,7 +22,13 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [strategyDeveloped, setStrategyDeveloped] = useState(false);
-  const [recommendedDatabases, setRecommendedDatabases] = useState<string[]>([]);
+  const [selectedDatabases, setSelectedDatabases] = useState<string[]>([]);
+
+  const allDatabases = ['PubMed','Crossref','OpenAlex','arXiv','SemanticScholar','ERIC','BASE','NASA ADS','DataCite','WHO GIM/LILACS','DBLP'];
+
+  const toggleDatabase = (db: string) => {
+    setSelectedDatabases(prev => prev.includes(db) ? prev.filter(d => d !== db) : [...prev, db]);
+  };
 
   const handleSaveProfile = () => {
     const newProfile: SearchProfile = {
@@ -57,7 +63,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
         searchTerms: strategy.finalizedQuery,
         queryVariants: strategy.queryVariants
       }));
-      setRecommendedDatabases(strategy.recommendedDatabases);
+      setSelectedDatabases(strategy.recommendedDatabases);
       setStrategyDeveloped(true);
     } catch (error) {
       console.error("Failed to develop strategy:", error);
@@ -69,9 +75,9 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
 
   const handleStartSearch = async () => {
     setIsProcessing(true);
-    setLoadingMessage("Performing literature search across recommended databases...");
+    setLoadingMessage("Performing literature search across selected databases...");
     try {
-      const { papers, searchLog, duplicateCount } = await performSearch(projectDetails, recommendedDatabases, testing ? 10 : undefined);
+      const { papers, searchLog, duplicateCount } = await performSearch(projectDetails, selectedDatabases, testing ? 10 : undefined);
       setPapers(papers);
       setSearchLog(searchLog);
       setDuplicateCount(duplicateCount);
@@ -107,7 +113,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
   };
 
   const isStrategyFormValid = projectDetails.description || projectDetails.searchTerms;
-  const isSearchFormValid = strategyDeveloped && projectDetails.searchTerms && recommendedDatabases.length > 0;
+  const isSearchFormValid = strategyDeveloped && projectDetails.searchTerms && selectedDatabases.length > 0;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -132,21 +138,21 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
                 {projectDetails.searchProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             )}
-            <textarea name="searchTerms" id="searchTerms" rows={4} value={projectDetails.searchTerms} onChange={handleChange} disabled={strategyDeveloped} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 font-mono text-sm disabled:bg-slate-100 dark:disabled:bg-primary-800/50" placeholder='e.g. ("myocardial infarction" OR "heart attack") AND (prevention OR therapy)'></textarea>
-            {strategyDeveloped && <p className="mt-1 text-xs text-slate-500 dark:text-primary-400">Query has been finalized by the AI. To change it, you must go back and restart this step.</p>}
+            <textarea name="searchTerms" id="searchTerms" rows={4} value={projectDetails.searchTerms} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 font-mono text-sm" placeholder='e.g. ("myocardial infarction" OR "heart attack") AND (prevention OR therapy)'></textarea>
           </div>
 
           {strategyDeveloped && (
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-primary-300">AI Recommended Databases</label>
-              <div className="mt-2 flex gap-4 p-3 bg-slate-50 dark:bg-primary-950 rounded-md border border-slate-200 dark:border-primary-700">
-                  {recommendedDatabases.map(db => (
-                      <span key={db} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary-100 text-primary-800 dark:bg-primary-800 dark:text-primary-200">
-                          {db}
-                      </span>
-                  ))}
+              <label className="block text-sm font-medium text-slate-700 dark:text-primary-300">Select Databases</label>
+              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {allDatabases.map(db => (
+                  <label key={db} className="inline-flex items-center">
+                    <input type="checkbox" className="h-4 w-4 text-primary-600 border-gray-300 rounded" checked={selectedDatabases.includes(db)} onChange={() => toggleDatabase(db)} />
+                    <span className="ml-2 text-sm">{db}</span>
+                  </label>
+                ))}
               </div>
-              <p className="mt-1 text-xs text-slate-500 dark:text-primary-400">The literature search will be performed on these databases.</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-primary-400">Edit the list if you want to add or remove databases.</p>
             </div>
           )}
         </div>

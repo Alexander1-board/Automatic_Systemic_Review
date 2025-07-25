@@ -21,19 +21,12 @@ export default function App() {
     searchTerms: '',
     queryVariants: [],
     useUnpaywall: true,
-    useOpenAlt: false,
+    useOpenAlt: true,
     searchProfiles: [],
     activeProfileId: undefined,
     sourceFilters: {},
   });
 
-  const setUseUnpaywall = (val: boolean) => {
-    setProjectDetails(prev => ({ ...prev, useUnpaywall: val }));
-  };
-
-  const setUseOpenAlt = (val: boolean) => {
-    setProjectDetails(prev => ({ ...prev, useOpenAlt: val }));
-  };
 
   const [papers, setPapers] = useState<Paper[]>([]);
   const [searchLog, setSearchLog] = useState<SearchLogEntry[]>([]);
@@ -106,7 +99,7 @@ export default function App() {
   const renderStep = () => {
     switch (currentStep) {
       case AppStep.SETUP:
-        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} testing={testing} setTesting={setTesting} useUnpaywall={projectDetails.useUnpaywall ?? true} setUseUnpaywall={setUseUnpaywall} useOpenAlt={projectDetails.useOpenAlt ?? false} setUseOpenAlt={setUseOpenAlt} projectDetails={projectDetails} setProjectDetails={setProjectDetails} />;
+        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} testing={testing} setTesting={setTesting} />;
       case AppStep.PROJECT_DEFINITION:
         return <ProjectPage
             projectDetails={projectDetails}
@@ -129,7 +122,7 @@ export default function App() {
       case AppStep.EXPORT:
         return <ExportPage papers={papers} searchLog={searchLog} draft={draft} projectTitle={projectDetails.title} onBack={handleBack} model={model} duplicateCount={duplicateCount} />;
       default:
-        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} testing={testing} setTesting={setTesting} useUnpaywall={projectDetails.useUnpaywall ?? true} setUseUnpaywall={setUseUnpaywall} useOpenAlt={projectDetails.useOpenAlt ?? false} setUseOpenAlt={setUseOpenAlt} projectDetails={projectDetails} setProjectDetails={setProjectDetails} />;
+        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} testing={testing} setTesting={setTesting} />;
     }
   };
 
