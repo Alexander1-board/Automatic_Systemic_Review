@@ -60,7 +60,7 @@ const DraftingPage: React.FC<DraftingPageProps> = ({ summaries, draft, setDraft,
   return (
     <div className="bg-white dark:bg-primary-900 p-8 rounded-lg shadow-lg border border-slate-200 dark:border-primary-700">
       <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Draft Your Review</h2>
-      <p className="mt-2 text-sm text-slate-600 dark:text-primary-400">Assemble your systematic review. Use the AI to generate drafts for each section based on your curated summaries.</p>
+      <p className="mt-2 text-sm text-slate-600 dark:text-primary-400">Assemble your research report. Use the AI to generate drafts for each section based on your curated summaries.</p>
 
       <div className="my-6">
         <div className="border-b border-gray-200 dark:border-primary-700">

@@ -29,6 +29,7 @@ export interface ProjectDetails {
   description: string;
   searchTerms: string;
   queryVariants: string[];
+  outputInstructions?: string;
 }
 
 export interface Paper {
@@ -101,4 +102,7 @@ export interface PrismaCounts {
     fullTextAssessed: number;
     fullTextExcluded: number;
     studiesIncluded: number;
+}
+export interface ReportResult {
+  formattedOutput?: string;
 }

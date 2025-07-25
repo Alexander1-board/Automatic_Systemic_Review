@@ -36,7 +36,7 @@ const strategySchema = {
     properties: {
         suggestedTitle: {
             type: Type.STRING,
-            description: "A concise, academic title for the systematic review based on the research question."
+            description: "A concise, academic title for the research project based on the research question."
         },
         finalizedQuery: {
             type: Type.STRING,
@@ -59,7 +59,7 @@ const strategySchema = {
 
 export const classifyPaperPart = async (part: 'title' | 'abstract' | 'full-text', content: string, projectDetails: ProjectDetails, modelName: string) => {
     const prompt = `
-        A systematic review is being conducted with the title "${projectDetails.title}".
+        A comprehensive research project is being conducted with the title "${projectDetails.title}".
         The goal is: "${projectDetails.description}".
         
         Based on this goal, analyze the following paper's ${part}:
@@ -92,7 +92,7 @@ export const developSearchStrategy = async (
     modelName: string
 ): Promise<{ suggestedTitle: string, finalizedQuery: string, queryVariants: string[], recommendedDatabases: string[] }> => {
     const prompt = `
-        Act as an expert systematic review researcher. Your task is to develop a comprehensive search strategy based on the user's input.
+        Act as an expert research strategist. Your task is to develop a comprehensive search strategy based on the user's input.
         
         Available databases for searching are: "PubMed", "Crossref", "OpenAlex".
 
@@ -101,7 +101,7 @@ export const developSearchStrategy = async (
         - Initial Boolean Term Suggestions: "${termSuggestions}"
 
         Based on this input, perform the following steps and return the result in JSON format:
-        1.  Create a concise, formal, and academic title for the systematic review.
+        1.  Create a concise, formal, and academic title for the research project.
         2.  Analyze the research topic to determine the most relevant databases from the available list.
         3.  Refine and expand the user's initial boolean terms. Incorporate relevant synonyms and controlled vocabulary (like MeSH for biomedical topics) to create a single, robust, and finalized boolean query string. This query should be optimized for searching academic databases.
         4.  List the key synonyms or variants you identified.
@@ -157,10 +157,10 @@ export const generateDraftSection = async (section: DraftSection, content: strin
     let prompt;
     switch(section) {
         case DraftSection.INTRODUCTION:
-            prompt = `Write a compelling introduction for a systematic review titled "${content}". Lay out the research context and state the primary objectives.`;
+            prompt = `Write a compelling introduction for a research report titled "${content}". Lay out the research context and state the primary objectives.`;
             break;
         case DraftSection.METHODS:
-            prompt = `Based on the following summaries, write a 'Methods' section for a systematic review. Describe the search strategy, inclusion/exclusion criteria, and data extraction process. The summaries are:\n\n${JSON.stringify(content)}`;
+            prompt = `Based on the following summaries, write a 'Methods' section for a research report. Describe the search strategy, inclusion/exclusion criteria, and data extraction process. The summaries are:\n\n${JSON.stringify(content)}`;
             break;
         case DraftSection.RESULTS:
             prompt = `Synthesize the 'Key Findings' from the following paper summaries into a coherent 'Results' section. Group findings thematically if possible.\n\n${JSON.stringify(content)}`;
@@ -169,7 +169,7 @@ export const generateDraftSection = async (section: DraftSection, content: strin
             prompt = `Write a 'Discussion' section based on the following summaries. Interpret the results, discuss implications, mention limitations, and suggest future research directions.\n\n${JSON.stringify(content)}`;
             break;
         case DraftSection.ABSTRACT:
-             prompt = `Write a structured abstract (Background, Methods, Results, Conclusion) for a systematic review. The main content is as follows:\n\n${content}`;
+             prompt = `Write a structured abstract (Background, Methods, Results, Conclusion) for this research project. The main content is as follows:\n\n${content}`;
              break;
     }
     
@@ -203,5 +203,33 @@ export const generateCitations = async (papers: Paper[], style: CitationStyle, m
     } catch (error) {
         console.error(`Error generating citations for style ${style}:`, error);
         return `Error generating citations.`;
+    }
+}
+
+export const generateCustomReport = async (
+    draft: Record<DraftSection, string>,
+    instructions: string,
+    modelName: string
+): Promise<string> => {
+    const content = Object.entries(draft)
+        .map(([section, text]) => `### ${section}\n${text}`)
+        .join('\n\n');
+
+    const prompt = `
+        You will format the following research report according to these instructions: "${instructions || 'Use a standard academic structure.'}".
+        ---
+        ${content}
+        ---
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: modelName,
+            contents: prompt,
+        });
+        return response.text;
+    } catch (error) {
+        console.error('Error generating custom report:', error);
+        return content;
     }
 }

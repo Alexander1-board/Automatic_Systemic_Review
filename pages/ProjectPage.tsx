@@ -103,13 +103,18 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
         <div className="mt-6 space-y-6">
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Research Question and Description</label>
-            <textarea name="description" id="description" rows={4} value={projectDetails.description} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500" placeholder="Outline the objectives and scope of your systematic review..."></textarea>
+            <textarea name="description" id="description" rows={4} value={projectDetails.description} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500" placeholder="Outline the objectives and scope of your research project..."></textarea>
           </div>
 
           <div>
             <label htmlFor="searchTerms" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Boolean Term Suggestions</label>
             <textarea name="searchTerms" id="searchTerms" rows={4} value={projectDetails.searchTerms} onChange={handleChange} disabled={strategyDeveloped} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 font-mono text-sm disabled:bg-slate-100 dark:disabled:bg-primary-800/50" placeholder='e.g. ("myocardial infarction" OR "heart attack") AND (prevention OR therapy)'></textarea>
             {strategyDeveloped && <p className="mt-1 text-xs text-slate-500 dark:text-primary-400">Query has been finalized by the AI. To change it, you must go back and restart this step.</p>}
+          </div>
+
+          <div>
+            <label htmlFor="outputInstructions" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Desired Output Format (optional)</label>
+            <textarea name="outputInstructions" id="outputInstructions" rows={3} value={projectDetails.outputInstructions} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500" placeholder="Describe how you'd like the final report structured or any length requirements..."></textarea>
           </div>
 
           {strategyDeveloped && (

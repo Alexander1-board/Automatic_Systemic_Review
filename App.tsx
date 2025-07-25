@@ -19,6 +19,7 @@ export default function App() {
     description: '',
     searchTerms: '',
     queryVariants: [],
+    outputInstructions: '',
   });
 
   const [papers, setPapers] = useState<Paper[]>([]);
@@ -91,7 +92,7 @@ export default function App() {
       case AppStep.DRAFTING:
         return <DraftingPage summaries={summaries} draft={draft} setDraft={setDraft} onComplete={() => setCurrentStep(AppStep.EXPORT)} onBack={handleBack} projectDetails={projectDetails} model={model} />;
       case AppStep.EXPORT:
-        return <ExportPage papers={papers} searchLog={searchLog} draft={draft} projectTitle={projectDetails.title} onBack={handleBack} model={model} duplicateCount={duplicateCount} />;
+        return <ExportPage papers={papers} searchLog={searchLog} draft={draft} projectDetails={projectDetails} onBack={handleBack} model={model} duplicateCount={duplicateCount} />;
       default:
         return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} />;
     }
@@ -102,7 +103,7 @@ export default function App() {
       <header className="bg-white dark:bg-primary-900/50 backdrop-blur-sm border-b border-slate-200 dark:border-primary-700 sticky top-0 z-30">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <h1 className="text-xl font-bold text-primary-700 dark:text-primary-400">AutoReview</h1>
+            <h1 className="text-xl font-bold text-primary-700 dark:text-primary-400">AutoResearch</h1>
             <button
               onClick={toggleTheme}
               className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-primary-800 text-slate-500 dark:text-primary-400"
