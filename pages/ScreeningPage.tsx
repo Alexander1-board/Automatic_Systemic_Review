@@ -102,7 +102,7 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
     setPapers(updatedPapers);
     setIsLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectDetails, model, papers.length]);
+  }, [papers, projectDetails, model]);
 
   useEffect(() => {
       if (!hasStarted || isPaused) return;
