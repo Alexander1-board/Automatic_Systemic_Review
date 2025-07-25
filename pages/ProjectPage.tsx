@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ProjectDetails, Paper, SearchLogEntry, SearchProfile } from '../types';
+import { ProjectDetails, Paper, SearchLogEntry } from '../types';
 import ProjectPreviewCard from '../components/ProjectPreviewCard';
 import { performSearch } from '../services/searchService';
 import { developSearchStrategy } from '../services/geminiService';
@@ -30,27 +30,14 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
     setSelectedDatabases(prev => prev.includes(db) ? prev.filter(d => d !== db) : [...prev, db]);
   };
 
-  const handleSaveProfile = () => {
-    const newProfile: SearchProfile = {
-      id: Date.now().toString(),
-      name: `Profile ${projectDetails.searchProfiles?.length ?? 0 + 1}`,
-      searchTerms: projectDetails.searchTerms,
-      sourceFilters: {},
-    };
-    setProjectDetails(prev => ({
-      ...prev,
-      searchProfiles: [...(prev.searchProfiles || []), newProfile],
-      activeProfileId: newProfile.id,
-    }));
-  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setProjectDetails(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleDevelopStrategy = async () => {
-    if (!projectDetails.description && !projectDetails.searchTerms) {
-      alert("Please provide a research question/description and some term suggestions to begin.");
+    if (!projectDetails.description) {
+      alert("Please provide a research question and scope to begin.");
       return;
     }
     setIsProcessing(true);
@@ -112,38 +99,29 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
     URL.revokeObjectURL(url);
   };
 
-  const isStrategyFormValid = projectDetails.description || projectDetails.searchTerms;
+  const isStrategyFormValid = !!projectDetails.description;
   const isSearchFormValid = strategyDeveloped && projectDetails.searchTerms && selectedDatabases.length > 0;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2 bg-white dark:bg-primary-900 p-8 rounded-lg shadow-lg border border-slate-200 dark:border-primary-700">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Define Your Project</h2>
-        <p className="mt-2 text-sm text-slate-600 dark:text-primary-400">Provide your research question and initial terms. The AI will develop a comprehensive search strategy for you.</p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-primary-400">Describe your research question and scope. The AI will craft boolean terms and suggest databases based on your input.</p>
         
         <div className="mt-6 space-y-6">
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Research Question and Description</label>
-            <textarea name="description" id="description" rows={4} value={projectDetails.description} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500" placeholder="Outline the objectives and scope of your systematic review..."></textarea>
+            <textarea name="description" id="description" rows={4} value={projectDetails.description} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500" placeholder="e.g. Evaluate treatments for chronic migraine in adults, focusing on randomized trials from the last decade."></textarea>
           </div>
 
           <div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="searchTerms" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Boolean Term Suggestions</label>
-              <button type="button" onClick={handleSaveProfile} className="text-xs text-primary-600">Save as Profile</button>
-            </div>
-            {projectDetails.searchProfiles && projectDetails.searchProfiles.length > 0 && (
-              <select className="mt-1 block w-full border rounded" value={projectDetails.activeProfileId || ''} onChange={e => setProjectDetails(prev => ({ ...prev, activeProfileId: e.target.value }))}>
-                <option value="">Current</option>
-                {projectDetails.searchProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            )}
-            <textarea name="searchTerms" id="searchTerms" rows={4} value={projectDetails.searchTerms} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 font-mono text-sm" placeholder='e.g. ("myocardial infarction" OR "heart attack") AND (prevention OR therapy)'></textarea>
+            <label htmlFor="analysisPlan" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Define the Analysis</label>
+            <textarea name="analysisPlan" id="analysisPlan" rows={3} value={projectDetails.analysisPlan || ''} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 text-sm" placeholder="Summarize study quality, outcomes, and compare interventions" />
           </div>
 
           <div>
-            <label htmlFor="analysisFocus" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Analysis Focus (optional)</label>
-            <textarea name="analysisFocus" id="analysisFocus" rows={2} value={projectDetails.analysisFocus || ''} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 text-sm" placeholder="e.g. compare interventions by indication" />
+            <label htmlFor="reportStructure" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Report Structure</label>
+            <textarea name="reportStructure" id="reportStructure" rows={3} value={projectDetails.reportStructure || ''} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 text-sm" placeholder="Introduction\nMethods\nResults\nDiscussion\nConclusion" />
           </div>
 
           {strategyDeveloped && (

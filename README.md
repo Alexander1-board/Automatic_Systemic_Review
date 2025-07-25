@@ -18,7 +18,8 @@ This contains everything you need to run your app locally.
 - The AI suggests relevant databases (PubMed, Crossref, OpenAlex, ERIC, BASE, NASA ADS, DataCite, WHO GIM/LILACS, DBLP, etc.). You can adjust this list before running the search.
 - "Testing mode" limits results to 10 per source after deduplication (hover for details).
 - A running total of Gemini tokens is shown on the export page diagnostics.
-- Use the "Analysis Focus" field to specify topics or indications you want emphasised in summaries and drafts.
+- Boolean search terms are generated automatically from your description.
+- Use the "Analysis" and "Report Structure" fields to guide what the summaries and draft should cover.
 - Keyboard shortcuts during screening: **K** to keep, **E** to exclude, **Enter** to advance.
 - The app periodically saves a snapshot locally so crashes can be recovered. A
   **Resume Previous Session** button will appear on the welcome page if data is

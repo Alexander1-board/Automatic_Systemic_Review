@@ -29,7 +29,8 @@ export interface ProjectDetails {
   description: string;
   searchTerms: string;
   queryVariants: string[];
-  analysisFocus?: string;
+  analysisPlan?: string;
+  reportStructure?: string;
   useUnpaywall?: boolean;
   useOpenAlt?: boolean;
   searchProfiles?: SearchProfile[];

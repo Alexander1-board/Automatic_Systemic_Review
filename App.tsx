@@ -20,7 +20,8 @@ export default function App() {
     description: '',
     searchTerms: '',
     queryVariants: [],
-    analysisFocus: '',
+    analysisPlan: 'Summarise study quality, outcomes, and key comparisons to inform clinical decision making.',
+    reportStructure: 'Introduction\nMethods\nResults\nDiscussion\nConclusion',
     useUnpaywall: true,
     useOpenAlt: true,
     searchProfiles: [],
@@ -132,7 +133,7 @@ export default function App() {
       case AppStep.SCREENING:
         return <ScreeningPage papers={papers} setPapers={setPapers} projectDetails={projectDetails} onComplete={() => setCurrentStep(AppStep.SUMMARY_GENERATION)} onBack={handleBack} model={model} />;
       case AppStep.SUMMARY_GENERATION:
-        return <SummaryPage papers={keptPapers} summaries={summaries} setSummaries={setSummaries} onComplete={() => setCurrentStep(AppStep.DRAFTING)} onBack={handleBack} model={model} analysisFocus={projectDetails.analysisFocus || ''} />;
+        return <SummaryPage papers={keptPapers} summaries={summaries} setSummaries={setSummaries} onComplete={() => setCurrentStep(AppStep.DRAFTING)} onBack={handleBack} model={model} analysisPlan={projectDetails.analysisPlan || ''} />;
       case AppStep.DRAFTING:
         return <DraftingPage summaries={summaries} draft={draft} setDraft={setDraft} onComplete={() => setCurrentStep(AppStep.EXPORT)} onBack={handleBack} projectDetails={projectDetails} model={model} />;
       case AppStep.EXPORT:
