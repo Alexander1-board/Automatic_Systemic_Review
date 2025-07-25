@@ -1,12 +1,13 @@
 {
-  "name": "autoreview",
+  "name": "autoresearch",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --loader ts-node/esm tests/reportGenerator.test.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "typescript": "~5.7.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "ts-node": "^10.9.2"
   }
 }

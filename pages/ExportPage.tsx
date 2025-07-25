@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Paper, DraftSection, CitationStyle, SearchLogEntry, PrismaCounts, ScreeningDecision } from '../types';
+import { Paper, DraftSection, CitationStyle, SearchLogEntry, PrismaCounts, ScreeningDecision, ProjectDetails } from '../types';
 import { generateCitations } from '../services/geminiService';
+import { generateReport } from '../services/reportGenerator';
+import ReportViewer from '../components/ReportViewer';
 import { calculatePrismaCounts } from '../utils/prismaUtils';
 import PrismaDiagram from '../components/PrismaDiagram';
 
@@ -8,23 +10,37 @@ interface ExportPageProps {
   papers: Paper[];
   searchLog: SearchLogEntry[];
   draft: Record<DraftSection, string>;
-  projectTitle: string;
+  projectDetails: ProjectDetails;
   onBack: () => void;
   model: string;
   duplicateCount: number;
 }
 
-const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, projectTitle, onBack, model, duplicateCount }) => {
+const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, projectDetails, onBack, model, duplicateCount }) => {
   const [citationStyle, setCitationStyle] = useState<CitationStyle>(CitationStyle.APA);
   const [citations, setCitations] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [customReport, setCustomReport] = useState('');
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const prismaCounts: PrismaCounts = useMemo(() => {
     return calculatePrismaCounts(papers, searchLog, duplicateCount);
   }, [papers, searchLog, duplicateCount]);
 
+  const handleGenerateReport = useCallback(async () => {
+    setIsGeneratingReport(true);
+    try {
+      const result = await generateReport(draft, model, projectDetails.outputInstructions);
+      setCustomReport(result.formattedOutput || '');
+    } catch (error) {
+      console.error('Failed to generate custom report', error);
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  }, [draft, projectDetails.outputInstructions, model]);
+
   const fullText = `
-# ${projectTitle}
+# ${projectDetails.title}
 
 ## Abstract
 ${draft.Abstract}
@@ -45,10 +61,12 @@ ${draft.Discussion}
 ${citations}
   `.trim();
 
+  const finalText = customReport || fullText;
+
   const handleGenerateCitations = useCallback(async () => {
     const papersToCite = papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP);
     if (papersToCite.length === 0) {
-      setCitations("No papers were included in the final review to cite.");
+      setCitations("No papers were included in the final report to cite.");
       return;
     };
     setIsGenerating(true);
@@ -64,11 +82,11 @@ ${citations}
   }, [papers, citationStyle, model]);
   
   const downloadAsTxt = () => {
-    const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
+    const blob = new Blob([finalText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${projectTitle.replace(/\s+/g, '_')}_review.txt`;
+    link.download = `${projectDetails.title.replace(/\s+/g, '_')}_report.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -85,7 +103,7 @@ ${citations}
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${projectTitle.replace(/\s+/g, '_')}_search_log.csv`;
+    link.download = `${projectDetails.title.replace(/\s+/g, '_')}_search_log.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -98,7 +116,7 @@ ${citations}
           <div className="flex justify-between items-center">
               <div>
                   <h2 className="text-2xl font-bold text-slate-900 dark:text-white">PRISMA Flow Diagram</h2>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-primary-400">This diagram visualizes the flow of information through the different phases of your review.</p>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-primary-400">This diagram visualizes the flow of information through the different phases of your research.</p>
               </div>
                <button
                   type="button"
@@ -117,7 +135,7 @@ ${citations}
            <div className="flex justify-between items-center">
               <div>
                   <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Search History</h2>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-primary-400">A log of all searches performed for this review, ensuring reproducibility.</p>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-primary-400">A log of all searches performed for this research, ensuring reproducibility.</p>
               </div>
               <button
                   onClick={downloadSearchLog}
@@ -152,7 +170,7 @@ ${citations}
 
       <div className="bg-white dark:bg-primary-900 p-8 rounded-lg shadow-lg border border-slate-200 dark:border-primary-700">
         <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Export Review</h2>
-        <p className="mt-2 text-sm text-slate-600 dark:text-primary-400">Generate citations for your included papers and download your completed systematic review.</p>
+        <p className="mt-2 text-sm text-slate-600 dark:text-primary-400">Generate citations for your included papers and download your completed research report.</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-6">
           <div className="md:col-span-1 space-y-6">
             <div>
@@ -169,17 +187,23 @@ ${citations}
             </div>
             <textarea readOnly value={citations} rows={10} className="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 dark:bg-primary-950 dark:border-primary-700 shadow-sm sm:text-sm" placeholder="Generated citations will appear here..."/>
             <div>
-              <h3 className="text-lg font-semibold">Download</h3>
-              <p className="text-sm text-slate-500 dark:text-primary-400 mt-1">Download the complete review as a text file.</p>
+              <h3 className="text-lg font-semibold">Generate custom-formatted report</h3>
+              <p className="text-sm text-slate-500 dark:text-primary-400 mt-1">Generate and download a report using your output instructions.</p>
+              <button onClick={handleGenerateReport} disabled={isGeneratingReport} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-slate-400">
+                  {isGeneratingReport ? 'Formatting...' : 'Generate'}
+              </button>
               <button onClick={downloadAsTxt} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                   Download .txt
+              </button>
+              <button onClick={() => navigator.clipboard.writeText(finalText)} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                  Copy to Clipboard
               </button>
             </div>
           </div>
           <div className="md:col-span-2">
-              <h3 className="text-lg font-semibold">Review Preview</h3>
+              <h3 className="text-lg font-semibold">Report Preview</h3>
               <div className="mt-2 p-4 h-[600px] overflow-y-auto rounded-md border border-slate-300 dark:border-primary-700 bg-slate-50 dark:bg-primary-950">
-                  <pre className="whitespace-pre-wrap text-sm font-sans">{fullText}</pre>
+                  <ReportViewer text={finalText} />
               </div>
           </div>
         </div>

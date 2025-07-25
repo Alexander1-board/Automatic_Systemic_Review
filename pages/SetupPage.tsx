@@ -14,9 +14,9 @@ const SetupPage: React.FC<SetupPageProps> = ({ onComplete, model, setModel }) =>
     <div className="max-w-2xl mx-auto">
       <div className="text-center">
         <SparklesIcon className="mx-auto h-12 w-12 text-primary-500" />
-        <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">AutoReview</h2>
+        <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">AutoResearch</h2>
         <p className="mt-4 text-lg text-slate-600 dark:text-primary-300">
-          Select your model to Automate the creation of a Systematic Review defined by you.
+          Select your model to automate the creation of a comprehensive research project defined by you.
         </p>
       </div>
       <div className="mt-10 bg-white dark:bg-primary-900 p-8 rounded-lg shadow-lg border border-slate-200 dark:border-primary-700">
@@ -36,7 +36,7 @@ const SetupPage: React.FC<SetupPageProps> = ({ onComplete, model, setModel }) =>
                 {availableModels.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
               <p className="mt-2 text-xs text-slate-500 dark:text-primary-400">
-                Select the AI model to power your review.
+                Select the AI model to power your research.
               </p>
             </div>
           </div>

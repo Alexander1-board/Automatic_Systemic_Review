@@ -1,6 +1,6 @@
 {
-  "name": "AutoReview",
-  "description": "A client-side application to automate the systematic review process using the Gemini API, from searching for papers to drafting the final review.",
+  "name": "AutoResearch",
+  "description": "A client-side application for conducting exhaustive research on any topic using the Gemini API. Search multiple databases and generate a custom report.",
   "requestFramePermissions": [],
   "prompt": ""
 }

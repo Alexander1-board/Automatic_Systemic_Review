@@ -20,7 +20,7 @@ const ProjectPreviewCard: React.FC<ProjectPreviewCardProps> = ({ projectDetails,
         
         <div>
           <label className="text-sm font-medium text-slate-500 dark:text-primary-400">Description</label>
-          <p className="mt-1 text-slate-700 dark:text-primary-300 h-16 overflow-y-auto">{projectDetails.description || 'A short description of your systematic review.'}</p>
+          <p className="mt-1 text-slate-700 dark:text-primary-300 h-16 overflow-y-auto">{projectDetails.description || 'A short description of your research project.'}</p>
         </div>
         
         <div>
