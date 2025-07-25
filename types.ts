@@ -123,6 +123,15 @@ export interface SearchLogEntry {
     date: string; // ISO String
 }
 
+export interface GeminiLogEntry {
+    timestamp: string;
+    action: string;
+    stage?: string;
+    paperId?: string;
+    ms?: number;
+    error?: string;
+}
+
 export interface PrismaCounts {
     identification: Array<{ db: string; hits: number }>;
     duplicates: number;

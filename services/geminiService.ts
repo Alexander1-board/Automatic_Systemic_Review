@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { ProjectDetails, Paper, Summary, DraftSection, CitationStyle, ExclusionReason } from '../types';
+import { ProjectDetails, Paper, Summary, DraftSection, CitationStyle, ExclusionReason, GeminiLogEntry } from '../types';
 
 if (!process.env.API_KEY) {
   // In a real app, you'd want to handle this more gracefully.
@@ -9,6 +9,17 @@ if (!process.env.API_KEY) {
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+const LOG_KEY = 'gemini_logs';
+const logGemini = (entry: GeminiLogEntry) => {
+    try {
+        const logs: GeminiLogEntry[] = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+        logs.push(entry);
+        localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    } catch (err) {
+        console.warn('Failed to write Gemini log', err);
+    }
+};
 
 const classificationSchema = {
     type: Type.OBJECT,
@@ -69,6 +80,7 @@ export const classifyPaperPart = async (part: 'title' | 'abstract' | 'full-text'
         Should this paper be included or excluded? Provide a confidence score and a brief justification.
     `;
 
+    const start = performance.now();
     try {
         const response = await ai.models.generateContent({
             model: modelName,
@@ -79,9 +91,12 @@ export const classifyPaperPart = async (part: 'title' | 'abstract' | 'full-text'
             }
         });
         const jsonText = response.text.trim();
-        return JSON.parse(jsonText);
-    } catch (error) {
+        const result = JSON.parse(jsonText);
+        logGemini({ timestamp: new Date().toISOString(), action: 'classify', stage: part, ms: performance.now() - start });
+        return result;
+    } catch (error: any) {
         console.error(`Error classifying paper ${part}:`, error);
+        logGemini({ timestamp: new Date().toISOString(), action: 'classify', stage: part, ms: performance.now() - start, error: error?.message || String(error) });
         return { decision: 'exclude', confidence: 0, justification: 'Error during analysis.' };
     }
 };
@@ -106,6 +121,7 @@ export const developSearchStrategy = async (
         3.  Refine and expand the user's initial boolean terms. Incorporate relevant synonyms and controlled vocabulary (like MeSH for biomedical topics) to create a single, robust, and finalized boolean query string. This query should be optimized for searching academic databases.
         4.  List the key synonyms or variants you identified.
     `;
+    const start = performance.now();
     try {
         const response = await ai.models.generateContent({
             model: modelName,
@@ -116,9 +132,11 @@ export const developSearchStrategy = async (
             }
         });
         const jsonText = response.text.trim();
+        logGemini({ timestamp: new Date().toISOString(), action: 'strategy', ms: performance.now() - start });
         return JSON.parse(jsonText);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error developing search strategy:", error);
+        logGemini({ timestamp: new Date().toISOString(), action: 'strategy', ms: performance.now() - start, error: error?.message || String(error) });
         return {
             suggestedTitle: "Error: Could not generate title",
             finalizedQuery: termSuggestions,
@@ -136,6 +154,7 @@ export const generateStructuredSummary = async (paper: Paper, modelName: string)
         Abstract: "${paper.abstract}"
         Focus on these four areas: Methodology, Key Findings, Research Context, and Conclusions.
     `;
+    const start = performance.now();
     try {
         const response = await ai.models.generateContent({
             model: modelName,
@@ -146,9 +165,11 @@ export const generateStructuredSummary = async (paper: Paper, modelName: string)
             }
         });
         const jsonText = response.text.trim();
+        logGemini({ timestamp: new Date().toISOString(), action: 'summary', paperId: paper.id, ms: performance.now() - start });
         return JSON.parse(jsonText);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error generating structured summary:", error);
+        logGemini({ timestamp: new Date().toISOString(), action: 'summary', paperId: paper.id, ms: performance.now() - start, error: error?.message || String(error) });
         return { methodology: 'Error', keyFindings: 'Error', researchContext: 'Error', conclusions: 'Error' };
     }
 };
@@ -172,15 +193,18 @@ export const generateDraftSection = async (section: DraftSection, content: strin
              prompt = `Write a structured abstract (Background, Methods, Results, Conclusion) for a systematic review. The main content is as follows:\n\n${content}`;
              break;
     }
-    
+
     try {
+        const start = performance.now();
         const response = await ai.models.generateContent({
             model: modelName,
             contents: prompt,
         });
+        logGemini({ timestamp: new Date().toISOString(), action: 'draft', stage: section, ms: performance.now() - start });
         return response.text;
-    } catch (error) {
+    } catch (error: any) {
         console.error(`Error generating draft for ${section}:`, error);
+        logGemini({ timestamp: new Date().toISOString(), action: 'draft', stage: section, ms: performance.now() - start, error: error?.message || String(error) });
         return `Error generating content for ${section}.`;
     }
 };
@@ -194,14 +218,17 @@ export const generateCitations = async (papers: Paper[], style: CitationStyle, m
         ${JSON.stringify(paperData, null, 2)}
     `;
 
+    const start = performance.now();
     try {
         const response = await ai.models.generateContent({
             model: modelName,
             contents: prompt,
         });
+        logGemini({ timestamp: new Date().toISOString(), action: 'citations', ms: performance.now() - start });
         return response.text;
-    } catch (error) {
+    } catch (error: any) {
         console.error(`Error generating citations for style ${style}:`, error);
+        logGemini({ timestamp: new Date().toISOString(), action: 'citations', ms: performance.now() - start, error: error?.message || String(error) });
         return `Error generating citations.`;
     }
 }

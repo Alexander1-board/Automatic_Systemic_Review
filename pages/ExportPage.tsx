@@ -26,11 +26,15 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
 
   const diagnostics = useMemo(() => {
     const keys = Object.keys(localStorage).filter(k => k.startsWith('timing_'));
-    return keys.map(k => {
+    const dbStats = keys.map(k => {
       const arr = JSON.parse(localStorage.getItem(k) || '[]');
       const avg = arr.reduce((a:number,b:number)=>a+b,0) / (arr.length || 1);
       return { db: k.replace('timing_',''), avg };
     });
+    const aiLogs = JSON.parse(localStorage.getItem('gemini_logs') || '[]');
+    const aiCount = aiLogs.length;
+    const aiAvg = aiLogs.reduce((a:any,b:any)=>a+(b.ms||0),0) / (aiCount || 1);
+    return [...dbStats, { db: 'Gemini calls', avg: aiAvg, count: aiCount }];
   }, []);
 
   const prismaCounts: PrismaCounts = useMemo(() => {
@@ -260,7 +264,7 @@ ${citations}
             <h3 className="text-lg font-semibold">Diagnostics</h3>
             <ul className="mt-2 text-sm list-disc pl-6">
               {diagnostics.map(d => (
-                <li key={d.db}>{d.db}: avg {d.avg.toFixed(0)} ms</li>
+                <li key={d.db}>{d.db}: avg {d.avg.toFixed(0)} ms{d.count !== undefined ? ` (${d.count} calls)` : ''}</li>
               ))}
             </ul>
           </div>

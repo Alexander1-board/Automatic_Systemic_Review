@@ -79,7 +79,10 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
     for (let i = 0; i < papersToClassify.length; i++) {
       if (pauseRef.current) break;
       const paper = papersToClassify[i];
+      console.log('Classifying', stage, paper.id);
       const classification: any = await classifyWithWorker(paper);
+      console.log('Result', stage, paper.id, classification);
+      await new Promise(r => setTimeout(r, 1000));
       
       const paperIndex = updatedPapers.findIndex(p => p.id === paper.id);
       if (paperIndex !== -1) {
