@@ -43,11 +43,15 @@ export const performSearch = async (projectDetails: ProjectDetails, selectedData
         const start = performance.now();
         const data = await fn();
         const end = performance.now();
-        localStorage.setItem(key, JSON.stringify(data));
-        const tkey = `timing_${db}`;
-        const timings = JSON.parse(localStorage.getItem(tkey) || '[]');
-        timings.push(end - start);
-        localStorage.setItem(tkey, JSON.stringify(timings));
+        try {
+            localStorage.setItem(key, JSON.stringify(data));
+            const tkey = `timing_${db}`;
+            const timings = JSON.parse(localStorage.getItem(tkey) || '[]');
+            timings.push(end - start);
+            localStorage.setItem(tkey, JSON.stringify(timings));
+        } catch (err) {
+            console.warn('Cache write failed', err);
+        }
         return data;
     };
 
