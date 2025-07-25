@@ -263,74 +263,74 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
       )}
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 dark:divide-primary-700">
-          <thead className="bg-slate-50 dark:bg-primary-950/50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-primary-300 uppercase tracking-wider">Paper Details</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-primary-300 uppercase tracking-wider">AI Suggestion</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-primary-300 uppercase tracking-wider">Your Decision</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-primary-900 divide-y divide-slate-200 dark:divide-primary-700">
-            <List height={400} itemCount={papersForCurrentStage.length} itemSize={180} width="100%">
-              {({index, style}) => {
-                const paper = papersForCurrentStage[index];
-                const decisionField = getDecisionField(currentStage);
-                const reasonField = getReasonField(currentStage);
-                return (
-                <tr key={paper.id} style={style}>
-                  <td className="px-6 py-4 whitespace-normal max-w-xl align-top">
+        <div className="min-w-full divide-y divide-slate-200 dark:divide-primary-700">
+          <div className="hidden md:grid grid-cols-3 bg-slate-50 dark:bg-primary-950/50">
+            <div className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-primary-300 uppercase tracking-wider">Paper Details</div>
+            <div className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-primary-300 uppercase tracking-wider">AI Suggestion</div>
+            <div className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-primary-300 uppercase tracking-wider">Your Decision</div>
+          </div>
+          <List height={400} itemCount={papersForCurrentStage.length} itemSize={180} width="100%">
+            {({ index, style }) => {
+              const paper = papersForCurrentStage[index];
+              const decisionField = getDecisionField(currentStage);
+              const reasonField = getReasonField(currentStage);
+              return (
+                <div key={paper.id} style={style} className="grid grid-cols-3 divide-x divide-slate-200 dark:divide-primary-700 bg-white dark:bg-primary-900">
+                  <div className="px-6 py-4 whitespace-normal max-w-xl">
                     <div className="font-bold text-slate-900 dark:text-white">{paper.title}</div>
                     <div className="text-sm text-slate-500 dark:text-primary-400">{paper.authors.join(', ')} ({paper.year})</div>
                     <div className="text-xs text-slate-400 dark:text-primary-500">Source: {paper.dbSource}</div>
                     <div className="mt-2 text-sm text-slate-600 dark:text-primary-300">
-                        <button onClick={() => openModal(paper)} className="text-primary-600 dark:text-primary-400 hover:underline">View Details</button>
+                      <button onClick={() => openModal(paper)} className="text-primary-600 dark:text-primary-400 hover:underline">View Details</button>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap align-top">
+                  </div>
+                  <div className="px-6 py-4">
                     {paper[`${currentStage}Confidence` as keyof Paper] !== undefined ? (
-                        <div className="flex flex-col">
-                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full self-start ${paper[decisionField] === ScreeningDecision.KEEP ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}> 
-                                {paper[decisionField]} ({paper[`${currentStage}Confidence` as keyof Paper]}%)
-                            </span>
-                            <span className="text-xs text-slate-500 dark:text-primary-500 mt-1 italic max-w-xs block">{paper[`${currentStage}Justification` as keyof Paper] as string}</span>
-                        </div>
-                    ) : (<span className="text-xs text-slate-400 dark:text-primary-500 italic">Pending AI...</span>)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap align-top">
+                      <div className="flex flex-col">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full self-start ${paper[decisionField] === ScreeningDecision.KEEP ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{paper[decisionField]} ({paper[`${currentStage}Confidence` as keyof Paper]}%)</span>
+                        <span className="text-xs text-slate-500 dark:text-primary-500 mt-1 italic max-w-xs block">{paper[`${currentStage}Justification` as keyof Paper] as string}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 dark:text-primary-500 italic">Pending AI...</span>
+                    )}
+                  </div>
+                  <div className="px-6 py-4">
                     <fieldset>
                       <div className="space-y-2">
                         <div className="flex items-center">
-                          <input id={`keep-${paper.id}-${currentStage}`} name={`decision-${paper.id}-${currentStage}`} type="radio" checked={paper[decisionField] === ScreeningDecision.KEEP} onChange={() => handleDecisionChange(paper.id, ScreeningDecision.KEEP)} className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500"/>
+                          <input id={`keep-${paper.id}-${currentStage}`} name={`decision-${paper.id}-${currentStage}`} type="radio" checked={paper[decisionField] === ScreeningDecision.KEEP} onChange={() => handleDecisionChange(paper.id, ScreeningDecision.KEEP)} className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500" />
                           <label htmlFor={`keep-${paper.id}-${currentStage}`} className="ml-2 block text-sm font-medium text-slate-700 dark:text-primary-300">Keep</label>
                         </div>
                         <div className="flex items-center">
-                          <input id={`exclude-${paper.id}-${currentStage}`} name={`decision-${paper.id}-${currentStage}`} type="radio" checked={paper[decisionField] === ScreeningDecision.EXCLUDE} onChange={() => handleDecisionChange(paper.id, ScreeningDecision.EXCLUDE)} className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500"/>
+                          <input id={`exclude-${paper.id}-${currentStage}`} name={`decision-${paper.id}-${currentStage}`} type="radio" checked={paper[decisionField] === ScreeningDecision.EXCLUDE} onChange={() => handleDecisionChange(paper.id, ScreeningDecision.EXCLUDE)} className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500" />
                           <label htmlFor={`exclude-${paper.id}-${currentStage}`} className="ml-2 block text-sm font-medium text-slate-700 dark:text-primary-300">Exclude</label>
                         </div>
                       </div>
                     </fieldset>
                     {paper[decisionField] === ScreeningDecision.EXCLUDE && (
-                        <div className="mt-2">
-                            <select
-                              value={paper[reasonField] || ''}
-                              onChange={e => handleReasonChange(paper.id, e.target.value as ExclusionReason)}
-                              className="block w-full text-xs rounded-md border-slate-300 text-slate-900 dark:text-primary-100 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                            >
-                                <option value="" disabled>Select reason...</option>
-                                {Object.values(ExclusionReason).map(reason => (
-                                    <option key={reason} value={reason}>{reason}</option>
-                                ))}
-                            </select>
-                        </div>
+                      <div className="mt-2">
+                        <select
+                          value={paper[reasonField] || ''}
+                          onChange={(e) => handleReasonChange(paper.id, e.target.value as ExclusionReason)}
+                          className="block w-full text-xs rounded-md border-slate-300 text-slate-900 dark:text-primary-100 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                        >
+                          <option value="" disabled>
+                            Select reason...
+                          </option>
+                          {Object.values(ExclusionReason).map((reason) => (
+                            <option key={reason} value={reason}>
+                              {reason}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     )}
-                  </td>
-                </tr>
-                );
-              }}
-            </List>
-          </tbody>
-        </table>
+                  </div>
+                </div>
+              );
+            }}
+          </List>
+        </div>
       </div>
       
       <div className="mt-8 pt-5 border-t border-slate-200 dark:border-primary-700 flex items-center gap-4">
