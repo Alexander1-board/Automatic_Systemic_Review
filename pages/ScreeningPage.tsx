@@ -68,8 +68,7 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
     }
     
     setIsLoading(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectDetails, model, papers.length]);
+  }, [papers, projectDetails, model, threshold]);
 
   useEffect(() => {
       // Find the first paper that needs classification in the current stage to avoid re-running on every paper update
