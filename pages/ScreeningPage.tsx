@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { FixedSizeList as List } from 'react-window';
 import { Paper, ScreeningDecision, ProjectDetails, ExclusionReason } from '../types';
 import { classifyPaperPart } from '../services/geminiService';
 import { findOpenAccessPdf } from '../services/unpaywallService';
+import { findOpenAltPdf } from '../services/openAltService';
 import Modal from '../components/Modal';
 
 interface ScreeningPageProps {
@@ -17,10 +19,88 @@ type ScreeningStage = 'title' | 'abstract' | 'full-text';
 
 const STAGES: ScreeningStage[] = ['title', 'abstract', 'full-text'];
 
+interface RowProps {
+  index: number;
+  style: React.CSSProperties;
+  data: {
+    papers: Paper[];
+    decisionField: string;
+    reasonField: string;
+    currentStage: ScreeningStage;
+    handleDecisionChange: (id: string, d: ScreeningDecision) => void;
+    handleReasonChange: (id: string, r: ExclusionReason) => void;
+    openModal: (p: Paper) => void;
+  };
+}
+
+const Row: React.FC<RowProps> = ({ index, style, data }) => {
+  const paper = data.papers[index];
+  const {
+    decisionField,
+    reasonField,
+    currentStage,
+    handleDecisionChange,
+    handleReasonChange,
+    openModal,
+  } = data;
+
+  return (
+    <div style={style} className="grid grid-cols-3 border-b border-slate-200 dark:border-primary-700 px-4 py-2 text-sm">
+      <div className="pr-2">
+        <div className="font-bold text-slate-900 dark:text-white">{paper.title}</div>
+        <div className="text-xs text-slate-500 dark:text-primary-400">{paper.authors.join(', ')} ({paper.year})</div>
+        <div className="text-xs text-slate-400 dark:text-primary-500">Source: {paper.dbSource}</div>
+        <button onClick={() => openModal(paper)} className="mt-2 text-primary-600 dark:text-primary-400 hover:underline">View Details</button>
+      </div>
+      <div>
+        {paper[`${currentStage}Confidence` as keyof Paper] !== undefined ? (
+          <div className="flex flex-col">
+            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full self-start ${paper[decisionField as keyof Paper] === ScreeningDecision.KEEP ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{paper[decisionField as keyof Paper]} ({paper[`${currentStage}Confidence` as keyof Paper]}%)</span>
+            <span className="text-xs text-slate-500 dark:text-primary-500 mt-1 italic max-w-xs block">{paper[`${currentStage}Justification` as keyof Paper] as string}</span>
+          </div>
+        ) : (
+          <span className="text-xs text-slate-400 dark:text-primary-500 italic">Pending AI...</span>
+        )}
+      </div>
+      <div>
+        <fieldset>
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <input id={`keep-${paper.id}-${currentStage}`} name={`decision-${paper.id}-${currentStage}`} type="radio" checked={paper[decisionField as keyof Paper] === ScreeningDecision.KEEP} onChange={() => handleDecisionChange(paper.id, ScreeningDecision.KEEP)} className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500" />
+              <label htmlFor={`keep-${paper.id}-${currentStage}`} className="ml-2 block text-sm font-medium text-slate-700 dark:text-primary-300">Keep</label>
+            </div>
+            <div className="flex items-center">
+              <input id={`exclude-${paper.id}-${currentStage}`} name={`decision-${paper.id}-${currentStage}`} type="radio" checked={paper[decisionField as keyof Paper] === ScreeningDecision.EXCLUDE} onChange={() => handleDecisionChange(paper.id, ScreeningDecision.EXCLUDE)} className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500" />
+              <label htmlFor={`exclude-${paper.id}-${currentStage}`} className="ml-2 block text-sm font-medium text-slate-700 dark:text-primary-300">Exclude</label>
+            </div>
+          </div>
+        </fieldset>
+        {paper[decisionField as keyof Paper] === ScreeningDecision.EXCLUDE && (
+          <div className="mt-2">
+            <select value={paper[reasonField as keyof Paper] || ''} onChange={e => handleReasonChange(paper.id, e.target.value as ExclusionReason)} className="block w-full text-xs rounded-md border-slate-300 text-slate-900 dark:text-primary-100 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500">
+              <option value="" disabled>
+                Select reason...
+              </option>
+              {Object.values(ExclusionReason).map(reason => (
+                <option key={reason} value={reason}>
+                  {reason}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projectDetails, onComplete, onBack, model }) => {
   const [currentStage, setCurrentStage] = useState<ScreeningStage>('title');
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(isPaused);
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
 
@@ -45,6 +125,10 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
 
     let updatedPapers = [...papers];
     for (let i = 0; i < papersToClassify.length; i++) {
+      if (isPausedRef.current) {
+        setIsLoading(false);
+        return;
+      }
       const paper = papersToClassify[i];
       const contentToClassify = stage === 'title' ? paper.title : (paper.abstract || paper.title);
       // NOTE: A real full-text review would fetch content, here we just use the abstract again as a proxy.
@@ -64,6 +148,9 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
         setPapers([...updatedPapers]);
       }
       setProgress(((i + 1) / papersToClassify.length) * 100);
+      if ((i + 1) % 5 === 0) {
+        await new Promise(res => setTimeout(res, 0));
+      }
     }
     
     setIsLoading(false);
@@ -71,6 +158,7 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
   }, [projectDetails, model, papers.length]);
 
   useEffect(() => {
+      if (isLoading || isPaused) return;
       // Find the first paper that needs classification in the current stage to avoid re-running on every paper update
       const decisionField = getDecisionField(currentStage);
       const requiresClassification = papers.some(p => {
@@ -81,7 +169,7 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
       if (requiresClassification) {
         classifyAllPapersForStage(currentStage);
       }
-  }, [currentStage, papers, classifyAllPapersForStage]);
+  }, [currentStage, papers, classifyAllPapersForStage, isLoading, isPaused]);
   
   const handleDecisionChange = async (paperId: string, decision: ScreeningDecision) => {
     // Optimistically update the UI
@@ -104,7 +192,10 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
     if (currentStage === 'full-text' && decision === ScreeningDecision.KEEP) {
       const paper = updatedPapers.find(p => p.id === paperId);
       if (paper) {
-        const pdfUrl = await findOpenAccessPdf(paper.id);
+        let pdfUrl = await findOpenAccessPdf(paper.id);
+        if (!pdfUrl) {
+            pdfUrl = await findOpenAltPdf(paper.id);
+        }
         if (pdfUrl) {
             setPapers(prev => prev.map(p => p.id === paperId ? { ...p, oaPdfUrl: pdfUrl } : p));
         }
@@ -145,6 +236,34 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
     setIsModalOpen(true);
   }
 
+  const handleSaveEdit = (updated: Paper) => {
+    setPapers(prev => prev.map(p => p.id === updated.id ? updated : p));
+  }
+
+  const togglePause = () => {
+    setIsPaused(prev => !prev);
+  }
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (isModalOpen) return;
+      const undecided = papersForCurrentStage.find(p => !p[getDecisionField(currentStage)]);
+      if (!undecided) return;
+      if (e.key.toLowerCase() === 'k') {
+        handleDecisionChange(undecided.id, ScreeningDecision.KEEP);
+      } else if (e.key.toLowerCase() === 'e') {
+        handleDecisionChange(undecided.id, ScreeningDecision.EXCLUDE);
+      } else if (e.key === 'Enter') {
+        const idx = papersForCurrentStage.indexOf(undecided);
+        if (idx === papersForCurrentStage.length - 1 && allClassifiedForStage) {
+          handleNextStage();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [papersForCurrentStage, currentStage, isModalOpen, allClassifiedForStage]);
+
   const getStageStats = () => {
       const included = papersForCurrentStage.filter(p => p[getDecisionField(currentStage)] === ScreeningDecision.KEEP).length;
       const excluded = papersForCurrentStage.filter(p => p[getDecisionField(currentStage)] === ScreeningDecision.EXCLUDE).length;
@@ -174,86 +293,49 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
       
        <div className="text-center my-4 text-sm font-medium text-slate-500 dark:text-primary-400">{getStageStats()}</div>
 
-      {isLoading && papersForCurrentStage.some(p => !p[getDecisionField(currentStage)]) && (
+      {(isLoading || isPaused) && papersForCurrentStage.some(p => !p[getDecisionField(currentStage)]) && (
         <div className="my-4">
-          <div className="text-center text-sm text-slate-500 dark:text-primary-400">AI Classification in progress...</div>
+          <div className="text-center text-sm text-slate-500 dark:text-primary-400">AI Classification {isPaused ? 'paused' : 'in progress'}...</div>
           <div className="w-full bg-slate-200 dark:bg-primary-800 rounded-full h-2.5 mt-2">
             <div className="bg-primary-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+          </div>
+          <div className="text-center mt-2">
+            <button onClick={togglePause} className="text-xs text-primary-600 dark:text-primary-400 hover:underline">
+              {isPaused ? 'Resume AI' : 'Pause AI'}
+            </button>
           </div>
         </div>
       )}
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 dark:divide-primary-700">
-          <thead className="bg-slate-50 dark:bg-primary-950/50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-primary-300 uppercase tracking-wider">Paper Details</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-primary-300 uppercase tracking-wider">AI Suggestion</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-primary-300 uppercase tracking-wider">Your Decision</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white dark:bg-primary-900 divide-y divide-slate-200 dark:divide-primary-700">
-            {papersForCurrentStage.map(paper => {
-              const decisionField = getDecisionField(currentStage);
-              const reasonField = getReasonField(currentStage);
-              return (
-              <tr key={paper.id}>
-                <td className="px-6 py-4 whitespace-normal max-w-xl align-top">
-                  <div className="font-bold text-slate-900 dark:text-white">{paper.title}</div>
-                  <div className="text-sm text-slate-500 dark:text-primary-400">{paper.authors.join(', ')} ({paper.year})</div>
-                  <div className="text-xs text-slate-400 dark:text-primary-500">Source: {paper.dbSource}</div>
-                  <div className="mt-2 text-sm text-slate-600 dark:text-primary-300">
-                      <button onClick={() => openModal(paper)} className="text-primary-600 dark:text-primary-400 hover:underline">View Details</button>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap align-top">
-                  {paper[`${currentStage}Confidence` as keyof Paper] !== undefined ? (
-                      <div className="flex flex-col">
-                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full self-start ${paper[decisionField] === ScreeningDecision.KEEP ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                              {paper[decisionField]} ({paper[`${currentStage}Confidence` as keyof Paper]}%)
-                          </span>
-                          <span className="text-xs text-slate-500 dark:text-primary-500 mt-1 italic max-w-xs block">{paper[`${currentStage}Justification` as keyof Paper] as string}</span>
-                      </div>
-                  ) : (<span className="text-xs text-slate-400 dark:text-primary-500 italic">Pending AI...</span>)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap align-top">
-                  <fieldset>
-                    <div className="space-y-2">
-                      <div className="flex items-center">
-                        <input id={`keep-${paper.id}-${currentStage}`} name={`decision-${paper.id}-${currentStage}`} type="radio" checked={paper[decisionField] === ScreeningDecision.KEEP} onChange={() => handleDecisionChange(paper.id, ScreeningDecision.KEEP)} className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500"/>
-                        <label htmlFor={`keep-${paper.id}-${currentStage}`} className="ml-2 block text-sm font-medium text-slate-700 dark:text-primary-300">Keep</label>
-                      </div>
-                      <div className="flex items-center">
-                        <input id={`exclude-${paper.id}-${currentStage}`} name={`decision-${paper.id}-${currentStage}`} type="radio" checked={paper[decisionField] === ScreeningDecision.EXCLUDE} onChange={() => handleDecisionChange(paper.id, ScreeningDecision.EXCLUDE)} className="h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500"/>
-                        <label htmlFor={`exclude-${paper.id}-${currentStage}`} className="ml-2 block text-sm font-medium text-slate-700 dark:text-primary-300">Exclude</label>
-                      </div>
-                    </div>
-                  </fieldset>
-                  {paper[decisionField] === ScreeningDecision.EXCLUDE && (
-                      <div className="mt-2">
-                          <select 
-                            value={paper[reasonField] || ''}
-                            onChange={e => handleReasonChange(paper.id, e.target.value as ExclusionReason)}
-                            className="block w-full text-xs rounded-md border-slate-300 text-slate-900 dark:text-primary-100 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500"
-                          >
-                              <option value="" disabled>Select reason...</option>
-                              {Object.values(ExclusionReason).map(reason => (
-                                  <option key={reason} value={reason}>{reason}</option>
-                              ))}
-                          </select>
-                      </div>
-                  )}
-                </td>
-              </tr>
-            )})}
-          </tbody>
-        </table>
+        <div className="grid grid-cols-3 bg-slate-50 dark:bg-primary-950/50 text-xs font-medium text-slate-500 dark:text-primary-300 uppercase tracking-wider px-4 py-2">
+          <div>Paper Details</div>
+          <div>AI Suggestion</div>
+          <div>Your Decision</div>
+        </div>
+        <List
+          height={400}
+          itemCount={papersForCurrentStage.length}
+          itemSize={180}
+          width="100%"
+          itemData={{
+            papers: papersForCurrentStage,
+            decisionField: getDecisionField(currentStage),
+            reasonField: getReasonField(currentStage),
+            currentStage,
+            handleDecisionChange,
+            handleReasonChange,
+            openModal,
+          }}
+        >
+          {Row}
+        </List>
       </div>
       
       <div className="mt-8 pt-5 border-t border-slate-200 dark:border-primary-700 flex items-center gap-4">
         <button
             type="button"
-            onClick={onBack}
+            onClick={() => { setIsPaused(true); onBack(); }}
             className="px-6 py-3 border border-slate-300 dark:border-primary-700 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         >
             Back
@@ -263,7 +345,7 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
         </button>
       </div>
 
-       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} paper={selectedPaper} />
+       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} paper={selectedPaper} onSave={handleSaveEdit} />
 
     </div>
   );

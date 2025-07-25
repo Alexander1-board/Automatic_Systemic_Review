@@ -6,10 +6,22 @@ interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
     paper: Paper | null;
+    onSave?: (paper: Paper) => void;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, paper }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, paper, onSave }) => {
+    const [title, setTitle] = React.useState(paper?.title || '');
+    const [year, setYear] = React.useState(String(paper?.year || ''));
+    const [doi, setDoi] = React.useState(paper?.id || '');
     if (!isOpen || !paper) return null;
+
+    React.useEffect(() => {
+        if (paper) {
+            setTitle(paper.title);
+            setYear(String(paper.year));
+            setDoi(paper.id);
+        }
+    }, [paper]);
 
     return (
         <div className="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -21,11 +33,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, paper }) => {
                         <div className="bg-white dark:bg-primary-900 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                             <div className="sm:flex sm:items-start">
                                 <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                                    <h3 className="text-lg font-semibold leading-6 text-slate-900 dark:text-primary-100" id="modal-title">
-                                        {paper.title}
-                                    </h3>
-                                    <div className="mt-2">
-                                        <p className="text-sm text-slate-600 dark:text-primary-400">{paper.authors.join(", ")} ({paper.year}) - <em>{paper.source}</em></p>
+                                    <div className="space-y-2">
+                                        <input value={title} onChange={e => setTitle(e.target.value)} className="w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700" />
+                                        <input value={year} onChange={e => setYear(e.target.value)} className="w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700" />
+                                        <input value={doi} onChange={e => setDoi(e.target.value)} className="w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700" />
                                     </div>
                                     <div className="mt-4 prose dark:prose-invert max-w-none">
                                         {paper.oaPdfUrl && (
@@ -41,10 +52,19 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, paper }) => {
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-slate-50 dark:bg-primary-900/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                        <div className="bg-slate-50 dark:bg-primary-900/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-2">
+                            {onSave && (
+                                <button
+                                    type="button"
+                                    className="inline-flex justify-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700"
+                                    onClick={() => { onSave({ ...paper, title, year: parseInt(year,10) || paper.year, id: doi }); onClose(); }}
+                                >
+                                    Save
+                                </button>
+                            )}
                             <button
                                 type="button"
-                                className="mt-3 inline-flex w-full justify-center rounded-md bg-white dark:bg-primary-800 px-3 py-2 text-sm font-semibold text-slate-900 dark:text-primary-200 shadow-sm ring-1 ring-inset ring-slate-300 dark:ring-primary-700 hover:bg-slate-50 dark:hover:bg-primary-700 sm:mt-0 sm:w-auto"
+                                className="inline-flex w-full justify-center rounded-md bg-white dark:bg-primary-800 px-3 py-2 text-sm font-semibold text-slate-900 dark:text-primary-200 shadow-sm ring-1 ring-inset ring-slate-300 dark:ring-primary-700 hover:bg-slate-50 dark:hover:bg-primary-700 sm:w-auto"
                                 onClick={onClose}
                             >
                                 Close

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Paper, DraftSection, CitationStyle, SearchLogEntry, PrismaCounts, ScreeningDecision } from '../types';
 import { generateCitations } from '../services/geminiService';
 import { calculatePrismaCounts } from '../utils/prismaUtils';
@@ -18,10 +18,22 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
   const [citationStyle, setCitationStyle] = useState<CitationStyle>(CitationStyle.APA);
   const [citations, setCitations] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [autoExport, setAutoExport] = useState(false);
 
   const prismaCounts: PrismaCounts = useMemo(() => {
     return calculatePrismaCounts(papers, searchLog, duplicateCount);
   }, [papers, searchLog, duplicateCount]);
+
+  const handleAutoExport = useCallback(() => {
+    if (!autoExport) return;
+    downloadAsTxt();
+  }, [autoExport]);
+
+  useEffect(() => {
+    if (autoExport && !isGenerating) {
+        handleAutoExport();
+    }
+  }, [autoExport, isGenerating, handleAutoExport]);
 
   const fullText = `
 # ${projectTitle}
@@ -174,6 +186,10 @@ ${citations}
               <button onClick={downloadAsTxt} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                   Download .txt
               </button>
+              <label className="mt-3 inline-flex items-center">
+                 <input type="checkbox" checked={autoExport} onChange={e => setAutoExport(e.target.checked)} className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500" />
+                 <span className="ml-2 text-sm text-slate-700 dark:text-primary-300">Auto-export</span>
+              </label>
             </div>
           </div>
           <div className="md:col-span-2">

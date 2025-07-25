@@ -1,4 +1,5 @@
-import { Paper } from '../types';
+import { Paper, SourceFilter } from '../types';
+import { pool } from '../utils/workerPool';
 
 const APP_EMAIL = "autoreview-user@example.com"; // Polite API usage
 
@@ -122,12 +123,26 @@ const fetchPubMedAbstracts = async (idList: string[]): Promise<Map<string, strin
 };
 
 
-export const searchCrossref = async (query: string): Promise<Paper[]> => {
-    const url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(query)}&rows=50&mailto=${APP_EMAIL}`;
+const fetchWithCache = async (cacheKey: string, url: string) => {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+    const data = await pool.fetchJson(url);
+    localStorage.setItem(cacheKey, JSON.stringify(data));
+    return data;
+};
+
+export const searchCrossref = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    let url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(query)}&rows=${limit}&mailto=${APP_EMAIL}`;
+    const filterParts = [];
+    if (filter?.yearFrom) filterParts.push(`from-pub-date:${filter.yearFrom}`);
+    if (filter?.yearTo) filterParts.push(`until-pub-date:${filter.yearTo}`);
+    if (filter?.language) filterParts.push(`language:${filter.language}`);
+    if (filter?.docType) filterParts.push(`type:${filter.docType}`);
+    if (filterParts.length) url += `&filter=${filterParts.join(',')}`;
     try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`Crossref API error: ${response.statusText}`);
-        const data = await response.json();
+        const data = await fetchWithCache(`crossref:${url}`, url);
         const papers = data.message?.items?.map(parseCrossrefItem).filter((p: Paper | null): p is Paper => p !== null);
         return papers || [];
     } catch (error) {
@@ -136,8 +151,9 @@ export const searchCrossref = async (query: string): Promise<Paper[]> => {
     }
 };
 
-export const searchPubMed = async (query: string): Promise<Paper[]> => {
-    const eSearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=50&retmode=json`;
+export const searchPubMed = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    const docFilter = filter?.docType ? ` AND ${filter.docType}[pt]` : '';
+    const eSearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query + docFilter)}&retmax=${limit}&retmode=json`;
     try {
         const searchResponse = await fetch(eSearchUrl);
         if (!searchResponse.ok) throw new Error(`PubMed ESearch API error: ${searchResponse.statusText}`);
@@ -176,16 +192,131 @@ export const searchPubMed = async (query: string): Promise<Paper[]> => {
     }
 };
 
-export const searchOpenAlex = async (query: string): Promise<Paper[]> => {
-    const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=50&mailto=${APP_EMAIL}`;
+export const searchOpenAlex = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    let url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${limit}&mailto=${APP_EMAIL}`;
+    if (filter?.yearFrom) url += `&from_publication_date=${filter.yearFrom}`;
+    if (filter?.yearTo) url += `&to_publication_date=${filter.yearTo}`;
+    if (filter?.language) url += `&language=${filter.language}`;
+    if (filter?.docType) url += `&filter=type:${filter.docType}`;
     try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`OpenAlex API error: ${response.statusText}`);
-        const data = await response.json();
+        const data = await fetchWithCache(`openalex:${url}`, url);
         const papers = data.results?.map(parseOpenAlexItem).filter((p: Paper | null): p is Paper => p !== null);
         return papers || [];
     } catch (error) {
         console.error("Failed to fetch from OpenAlex:", error);
         return [];
     }
+};
+
+export const searchArxiv = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    let url = `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${limit}`;
+    if (filter?.yearFrom) url += `&start_date=${filter.yearFrom}`;
+    if (filter?.yearTo) url += `&end_date=${filter.yearTo}`;
+    if (filter?.docType) url += `&search_query=${encodeURIComponent(`cat:${filter.docType}`)}`;
+    try {
+        const cached = localStorage.getItem(`arxiv:${url}`);
+        let xmlText;
+        if (cached) {
+            xmlText = cached;
+        } else {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`arXiv API error: ${response.statusText}`);
+            xmlText = await response.text();
+            localStorage.setItem(`arxiv:${url}`, xmlText);
+        }
+        const entries = xmlText.split('<entry>').slice(1);
+        const papers: Paper[] = entries.map(entry => {
+            const id = entry.match(/<id>(.*?)<\/id>/)?.[1] || `arxiv-${Math.random()}`;
+            const title = entry.match(/<title>([\s\S]*?)<\/title>/)?.[1]?.replace(/\n/g, ' ').trim() || '';
+            const authors = Array.from(entry.matchAll(/<name>(.*?)<\/name>/g)).map(a => a[1]);
+            const abstract = entry.match(/<summary>([\s\S]*?)<\/summary>/)?.[1]?.replace(/\n/g, ' ').trim() || '';
+            const year = parseInt(entry.match(/<published>(\d{4})/)?.[1] || '0', 10);
+            return { id, title, authors, year, source: 'arXiv', abstract, fullTextUrl: id, dbSource: 'arXiv', searchDate: new Date().toISOString() };
+        });
+        return papers;
+    } catch (error) {
+        console.error('Failed to fetch from arXiv:', error);
+        return [];
+    }
+};
+
+export const searchSemanticScholar = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    let url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=${limit}&fields=title,authors,year,venue,abstract,url`;
+    if (filter?.yearFrom) url += `&year>=${filter.yearFrom}`;
+    if (filter?.yearTo) url += `&year<=${filter.yearTo}`;
+    if (filter?.docType) url += `&publicationTypes=${filter.docType}`;
+    try {
+        const data = await fetchWithCache(`semanticscholar:${url}`, url);
+        const papers = data.data?.map((item: any) => ({
+            id: item.paperId,
+            title: item.title,
+            authors: item.authors?.map((a: any) => a.name) || [],
+            year: item.year || 0,
+            source: item.venue || '',
+            abstract: item.abstract || '',
+            fullTextUrl: item.url || '',
+            dbSource: 'SemanticScholar',
+            searchDate: new Date().toISOString(),
+        })) || [];
+        return papers;
+    } catch (error) {
+        console.error('Failed to fetch from SemanticScholar:', error);
+        return [];
+    }
+};
+
+export const searchDoaj = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    let url = `https://doaj.org/api/v2/search/articles/${encodeURIComponent(query)}?page=1&pageSize=${limit}`;
+    if (filter?.yearFrom) url += `&from=${filter.yearFrom}`;
+    if (filter?.yearTo) url += `&to=${filter.yearTo}`;
+    if (filter?.language) url += `&lang=${filter.language}`;
+    if (filter?.docType) url += `&type=${filter.docType}`;
+    try {
+        const data = await fetchWithCache(`doaj:${url}`, url);
+        const papers = data.results?.map((item: any) => ({
+            id: item.id,
+            title: item.bibliographic?.title || '',
+            authors: item.bibliographic?.author || [],
+            year: parseInt(item.bibliographic?.year || '0', 10),
+            source: item.bibliographic?.journal || '',
+            abstract: item.bibliographic?.abstract || '',
+            fullTextUrl: item.bibliographic?.link || '',
+            dbSource: 'DOAJ',
+            searchDate: new Date().toISOString(),
+        })) || [];
+        return papers;
+    } catch (error) {
+        console.error('Failed to fetch from DOAJ:', error);
+        return [];
+    }
+};
+
+export const searchEric = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    console.log('ERIC search not implemented, query', query);
+    return [];
+};
+
+export const searchBase = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    console.log('BASE search not implemented, query', query);
+    return [];
+};
+
+export const searchNasaAds = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    console.log('NASA ADS search not implemented, query', query);
+    return [];
+};
+
+export const searchDataCite = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    console.log('DataCite search not implemented, query', query);
+    return [];
+};
+
+export const searchWhoGim = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    console.log('WHO GIM search not implemented, query', query);
+    return [];
+};
+
+export const searchDblp = async (query: string, limit = 50, filter?: SourceFilter): Promise<Paper[]> => {
+    console.log('DBLP search not implemented, query', query);
+    return [];
 };
