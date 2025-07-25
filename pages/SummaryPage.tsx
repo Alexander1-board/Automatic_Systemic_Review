@@ -1,7 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Paper, Summary } from '../types';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Chart from 'chart.js/auto';
+import { Paper, Summary, ScreeningDecision } from '../types';
 import { generateStructuredSummary } from '../services/geminiService';
 import { ChevronDownIcon } from '../components/Icons';
+import PrismaDiagram from '../components/PrismaDiagram';
+import { calculatePrismaCounts } from '../utils/prismaUtils';
+import { DiagnosticsPanel } from '../components/DiagnosticsPanel';
+import { apiLogs } from '../utils/apiLogger';
 
 interface SummaryPageProps {
   papers: Paper[];
@@ -16,6 +21,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummari
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
+  const chartRef = useRef<HTMLCanvasElement | null>(null);
 
   const generateAllSummaries = useCallback(async () => {
     if (papers.length === 0 || summaries.length === papers.length) return;
@@ -43,6 +49,24 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummari
   useEffect(() => {
     generateAllSummaries();
   }, [generateAllSummaries]);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const counts: Record<string, number> = {};
+    papers.forEach(p => {
+      if (p.fullTextDecision === ScreeningDecision.KEEP) {
+        counts[p.dbSource] = (counts[p.dbSource] || 0) + 1;
+      }
+    });
+    const chart = new Chart(chartRef.current, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(counts),
+        datasets: [{ data: Object.values(counts), backgroundColor: '#3b82f6' }],
+      },
+    });
+    return () => chart.destroy();
+  }, [papers]);
 
   const toggleAccordion = (paperId: string) => {
     setActiveAccordion(activeAccordion === paperId ? null : paperId);
@@ -103,6 +127,27 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummari
         </div>
       )}
 
+      <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div>
+          <h3 className="font-semibold mb-2">PRISMA Diagram</h3>
+          <PrismaDiagram counts={calculatePrismaCounts(papers, [], 0)} />
+        </div>
+        <div>
+          <h3 className="font-semibold mb-2">Sources vs Included</h3>
+          <canvas ref={chartRef} />
+        </div>
+      </div>
+
+      <DiagnosticsPanel logs={apiLogs} onDownload={() => {
+        const blob = new Blob([JSON.stringify(apiLogs, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'logs.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      }} />
+
       <div className="mt-8 pt-5 border-t border-slate-200 dark:border-primary-700 flex items-center gap-4">
         <button
             type="button"
@@ -110,6 +155,13 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummari
             className="px-6 py-3 border border-slate-300 dark:border-primary-700 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         >
             Back
+        </button>
+        <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 border border-slate-300 dark:border-primary-700 rounded-md shadow-sm text-sm font-medium text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+        >
+            Re-run Search
         </button>
         <button onClick={onComplete} disabled={isLoading || summaries.length !== papers.length} className="flex-grow flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-slate-400 disabled:cursor-not-allowed">
           Next: Draft Review

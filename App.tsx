@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { AppStep, Paper, ProjectDetails, ScreeningDecision, Summary, DraftSection, SearchLogEntry } from './types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { AppStep, Paper, ProjectDetails, ScreeningDecision, Summary, DraftSection, SearchLogEntry, SourceFilter } from './types';
 import SetupPage from './pages/SetupPage';
 import ProjectPage from './pages/ProjectPage';
 import ScreeningPage from './pages/ScreeningPage';
@@ -13,6 +13,8 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [currentStep, setCurrentStep] = useState<AppStep>(AppStep.SETUP);
   const [model, setModel] = useState<string>('gemini-2.5-pro');
+  const [testing, setTesting] = useState<boolean>(false);
+  const [sources, setSources] = useState<Record<string, SourceFilter>>({});
   
   const [projectDetails, setProjectDetails] = useState<ProjectDetails>({
     title: '',
@@ -41,6 +43,34 @@ export default function App() {
   };
 
   const keptPapers = useMemo(() => papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP), [papers]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const snapshot = {
+        step: currentStep,
+        projectDetails,
+        papers,
+        summaries,
+        draft,
+      };
+      localStorage.setItem('autosave', JSON.stringify(snapshot));
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [currentStep, projectDetails, papers, summaries, draft]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('autosave');
+    if (saved) {
+      try {
+        const snapshot = JSON.parse(saved);
+        setCurrentStep(snapshot.step);
+        setProjectDetails(snapshot.projectDetails);
+        setPapers(snapshot.papers || []);
+        setSummaries(snapshot.summaries || []);
+        setDraft(snapshot.draft || draft);
+      } catch {}
+    }
+  }, []);
 
   const orderedSteps = [
     AppStep.SETUP,
@@ -71,7 +101,15 @@ export default function App() {
   const renderStep = () => {
     switch (currentStep) {
       case AppStep.SETUP:
-        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} />;
+        return (
+          <SetupPage
+            onComplete={(src) => { setSources(src); setCurrentStep(AppStep.PROJECT_DEFINITION); }}
+            model={model}
+            setModel={setModel}
+            testing={testing}
+            setTesting={setTesting}
+          />
+        );
       case AppStep.PROJECT_DEFINITION:
         return <ProjectPage 
             projectDetails={projectDetails} 
@@ -83,6 +121,8 @@ export default function App() {
             onBack={handleBack} 
             model={model}
             searchLog={searchLog}
+            testing={testing}
+            sources={sources}
         />;
       case AppStep.SCREENING:
         return <ScreeningPage papers={papers} setPapers={setPapers} projectDetails={projectDetails} onComplete={() => setCurrentStep(AppStep.SUMMARY_GENERATION)} onBack={handleBack} model={model} />;
@@ -93,7 +133,15 @@ export default function App() {
       case AppStep.EXPORT:
         return <ExportPage papers={papers} searchLog={searchLog} draft={draft} projectTitle={projectDetails.title} onBack={handleBack} model={model} duplicateCount={duplicateCount} />;
       default:
-        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} />;
+        return (
+          <SetupPage
+            onComplete={(src) => { setSources(src); setCurrentStep(AppStep.PROJECT_DEFINITION); }}
+            model={model}
+            setModel={setModel}
+            testing={testing}
+            setTesting={setTesting}
+          />
+        );
     }
   };
 

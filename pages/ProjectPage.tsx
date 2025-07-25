@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ProjectDetails, Paper, SearchLogEntry } from '../types';
+import { ProjectDetails, Paper, SearchLogEntry, SourceFilter } from '../types';
 import ProjectPreviewCard from '../components/ProjectPreviewCard';
 import { performSearch } from '../services/searchService';
 import { developSearchStrategy } from '../services/geminiService';
@@ -15,9 +15,11 @@ interface ProjectPageProps {
   onBack: () => void;
   model: string;
   searchLog: SearchLogEntry[];
+  testing: boolean;
+  sources: Record<string, SourceFilter>;
 }
 
-const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDetails, setPapers, setSearchLog, setDuplicateCount, onStartSearch, onBack, model, searchLog }) => {
+const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDetails, setPapers, setSearchLog, setDuplicateCount, onStartSearch, onBack, model, searchLog, testing, sources }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [strategyDeveloped, setStrategyDeveloped] = useState(false);
@@ -56,7 +58,8 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
     setIsProcessing(true);
     setLoadingMessage("Performing literature search across recommended databases...");
     try {
-      const { papers, searchLog, duplicateCount } = await performSearch(projectDetails, recommendedDatabases);
+      const limit = testing ? 10 : 50;
+      const { papers, searchLog, duplicateCount } = await performSearch(projectDetails, recommendedDatabases, sources, limit);
       setPapers(papers);
       setSearchLog(searchLog);
       setDuplicateCount(duplicateCount);

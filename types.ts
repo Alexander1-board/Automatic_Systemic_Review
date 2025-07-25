@@ -29,6 +29,23 @@ export interface ProjectDetails {
   description: string;
   searchTerms: string;
   queryVariants: string[];
+  searchProfiles: SearchProfile[];
+  activeProfileId?: string;
+}
+
+export interface SourceFilter {
+  enabled: boolean;
+  yearFrom?: string;
+  yearTo?: string;
+  language?: string;
+  docType?: string;
+}
+
+export interface SearchProfile {
+  id: string;
+  name: string;
+  terms: string;
+  sources: Record<string, SourceFilter>;
 }
 
 export interface Paper {
