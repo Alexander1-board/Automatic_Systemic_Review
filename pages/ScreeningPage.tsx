@@ -186,7 +186,7 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
     setIsPaused(false);
   };
 
-  const handleNextStage = () => {
+  function handleNextStage() {
     const currentIndex = STAGES.indexOf(currentStage);
     if (currentIndex < STAGES.length - 1) {
       setCurrentStage(STAGES[currentIndex + 1]);
@@ -195,7 +195,7 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
     } else {
       onComplete();
     }
-  };
+  }
 
   const openModal = (paper: Paper) => {
     setSelectedPaper(paper);
