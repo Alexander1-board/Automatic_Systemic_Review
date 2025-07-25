@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Chart, BarController, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import JSZip from 'jszip';
+import { jsPDF } from 'jspdf';
 import { Paper, CitationStyle, SearchLogEntry, PrismaCounts, ScreeningDecision, DefaultDraftSections } from '../types';
 import { generateCitations } from '../services/geminiService';
 import { calculatePrismaCounts } from '../utils/prismaUtils';
@@ -101,35 +102,57 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
     }
   }, [papers, citationStyle, model]);
   
-  const downloadAsTxt = () => {
-    const blob = new Blob([fullText], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${projectTitle.replace(/\s+/g, '_')}_review.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const downloadAsPDF = () => {
+    const doc = new jsPDF();
+    const lines = fullText.split('\n');
+    let y = 10;
+    lines.forEach(line => {
+      const parts = doc.splitTextToSize(line, 180);
+      parts.forEach(t => {
+        doc.text(t, 10, y);
+        y += 7;
+        if (y > 280) { doc.addPage(); y = 10; }
+      });
+    });
+    doc.save(`${projectTitle.replace(/\s+/g, '_')}_review.pdf`);
   };
 
-  const downloadAsRIS = () => {
-    const lines = papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP).map(p => `TY  - JOUR\nTI  - ${p.title}\nAU  - ${p.authors.join('; ')}\nPY  - ${p.year}\nUR  - ${p.fullTextUrl}\nER  -`);
-    const blob = new Blob([lines.join('\n')], { type: 'application/x-research-info-systems' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${projectTitle.replace(/\s+/g, '_')}.ris`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const generatePdfBlob = () => {
+    const doc = new jsPDF();
+    const lines = fullText.split('\n');
+    let y = 10;
+    lines.forEach(line => {
+      const parts = doc.splitTextToSize(line, 180);
+      parts.forEach(t => {
+        doc.text(t, 10, y);
+        y += 7;
+        if (y > 280) { doc.addPage(); y = 10; }
+      });
+    });
+    return doc.output('blob');
   };
 
   const downloadZip = async () => {
     const zip = new JSZip();
-    zip.file('review.txt', fullText);
-    zip.file('citations.ris', papers.map(p => p.title).join('\n'));
+    zip.file('review.pdf', generatePdfBlob());
+
+    const included = papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP);
+    for (const p of included) {
+      const url = p.oaPdfUrl || p.fullTextUrl;
+      if (url && url.endsWith('.pdf')) {
+        try {
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            const safeTitle = p.title.replace(/[^a-z0-9]/gi, '_').slice(0, 30);
+            zip.file(`${safeTitle}.pdf`, blob);
+          }
+        } catch (err) {
+          console.warn('Failed to fetch PDF', err);
+        }
+      }
+    }
+
     const content = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(content);
     const a = document.createElement('a');
@@ -160,7 +183,7 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
 
   useEffect(() => {
     if (autoExport && citations) {
-      downloadAsTxt();
+      downloadAsPDF();
       downloadSearchLog();
     }
   }, [autoExport, citations]);
@@ -245,11 +268,10 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
             <div>
               <h3 className="text-lg font-semibold">Download</h3>
               <p className="text-sm text-slate-500 dark:text-primary-400 mt-1">Download the complete review.</p>
-              <button onClick={downloadAsTxt} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                  Download .txt
+              <button onClick={downloadAsPDF} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                  Download PDF
               </button>
-              <button onClick={downloadAsRIS} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">Download .ris</button>
-              <button onClick={downloadZip} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">Download ZIP</button>
+              <button onClick={downloadZip} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">Download ZIP with PDFs</button>
               <label className="mt-2 flex items-center text-sm">
                 <input type="checkbox" className="mr-2" checked={autoExport} onChange={e => setAutoExport(e.target.checked)} /> Auto-export on finish
               </label>

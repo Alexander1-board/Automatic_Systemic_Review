@@ -19,6 +19,8 @@ This contains everything you need to run your app locally.
 - "Testing mode" limits results to 10 per source after deduplication (hover for details).
 - A running total of Gemini tokens is shown on the export page diagnostics.
 - Boolean search terms are generated automatically from your description.
+- Downloads include a single PDF report or a ZIP containing that PDF and any
+  available full-text articles.
 - Use the "Analysis" and "Report Structure" fields to guide what the summaries and draft should cover.
 - Keyboard shortcuts during screening: **K** to keep, **E** to exclude, **Enter** to advance.
 - The app periodically saves a snapshot locally so crashes can be recovered. A
