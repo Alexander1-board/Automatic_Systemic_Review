@@ -5,22 +5,40 @@ interface SetupPageProps {
   onComplete: () => void;
   model: string;
   setModel: (model: string) => void;
+  threshold: number;
+  setThreshold: (value: number) => void;
 }
 
-const SetupPage: React.FC<SetupPageProps> = ({ onComplete, model, setModel }) => {
+const SetupPage: React.FC<SetupPageProps> = ({ onComplete, model, setModel, threshold, setThreshold }) => {
   const availableModels = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+  const apiKeyPlaceholder = 'process.env.GEMINI_API_KEY';
 
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center">
         <SparklesIcon className="mx-auto h-12 w-12 text-primary-500" />
-        <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">AutoReview</h2>
+        <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">Systematic Review Automator</h2>
         <p className="mt-4 text-lg text-slate-600 dark:text-primary-300">
           Select your model to Automate the creation of a Systematic Review defined by you.
         </p>
       </div>
       <div className="mt-10 bg-white dark:bg-primary-900 p-8 rounded-lg shadow-lg border border-slate-200 dark:border-primary-700">
         <div className="space-y-6">
+          <div>
+            <label htmlFor="api-key" className="block text-sm font-medium text-slate-700 dark:text-primary-300">
+              Gemini API Key
+            </label>
+            <input
+              id="api-key"
+              type="text"
+              readOnly
+              value={apiKeyPlaceholder}
+              className="mt-1 block w-full rounded-md border-slate-300 bg-slate-100 text-slate-900 dark:bg-primary-800 dark:text-primary-100 dark:border-primary-700 shadow-sm"
+            />
+            <p className="mt-2 text-xs text-slate-500 dark:text-primary-400">
+              This placeholder value is used for all API calls client-side.
+            </p>
+          </div>
           <div>
             <label htmlFor="ai-model" className="block text-sm font-medium text-slate-700 dark:text-primary-300">
               AI Model
@@ -39,6 +57,24 @@ const SetupPage: React.FC<SetupPageProps> = ({ onComplete, model, setModel }) =>
                 Select the AI model to power your review.
               </p>
             </div>
+          </div>
+          <div>
+            <label htmlFor="threshold" className="block text-sm font-medium text-slate-700 dark:text-primary-300">
+              Keep Threshold
+            </label>
+            <input
+              id="threshold"
+              type="number"
+              step="0.01"
+              min="0"
+              max="1"
+              value={threshold}
+              onChange={(e) => setThreshold(parseFloat(e.target.value))}
+              className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm"
+            />
+            <p className="mt-2 text-xs text-slate-500 dark:text-primary-400">
+              Higher values make the AI stricter when keeping papers.
+            </p>
           </div>
           <div className="pt-4">
             <button

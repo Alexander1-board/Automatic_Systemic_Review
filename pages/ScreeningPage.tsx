@@ -11,13 +11,14 @@ interface ScreeningPageProps {
   onComplete: () => void;
   onBack: () => void;
   model: string;
+  threshold: number;
 }
 
 type ScreeningStage = 'title' | 'abstract' | 'full-text';
 
 const STAGES: ScreeningStage[] = ['title', 'abstract', 'full-text'];
 
-const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projectDetails, onComplete, onBack, model }) => {
+const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projectDetails, onComplete, onBack, model, threshold }) => {
   const [currentStage, setCurrentStage] = useState<ScreeningStage>('title');
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -48,7 +49,7 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
       const paper = papersToClassify[i];
       const contentToClassify = stage === 'title' ? paper.title : (paper.abstract || paper.title);
       // NOTE: A real full-text review would fetch content, here we just use the abstract again as a proxy.
-      const classification = await classifyPaperPart(stage, contentToClassify, projectDetails, model);
+      const classification = await classifyPaperPart(stage, contentToClassify, projectDetails, model, threshold);
       
       const paperIndex = updatedPapers.findIndex(p => p.id === paper.id);
       if (paperIndex !== -1) {
