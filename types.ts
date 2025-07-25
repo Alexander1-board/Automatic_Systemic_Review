@@ -104,13 +104,15 @@ export interface Summary {
   conclusions: string;
 }
 
-export enum DraftSection {
-  INTRODUCTION = "Introduction",
-  METHODS = "Methods",
-  RESULTS = "Results",
-  DISCUSSION = "Discussion",
-  ABSTRACT = "Abstract",
-}
+export const DefaultDraftSections = [
+  'Introduction',
+  'Methods',
+  'Results',
+  'Discussion',
+  'Abstract',
+] as const;
+
+export type DraftSection = typeof DefaultDraftSections[number] | string;
 
 export enum CitationStyle {
     APA = "APA",

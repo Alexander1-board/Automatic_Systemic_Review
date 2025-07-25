@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Chart, BarController, BarElement, CategoryScale, LinearScale } from 'chart.js';
 import JSZip from 'jszip';
-import { Paper, DraftSection, CitationStyle, SearchLogEntry, PrismaCounts, ScreeningDecision } from '../types';
+import { Paper, CitationStyle, SearchLogEntry, PrismaCounts, ScreeningDecision, DefaultDraftSections } from '../types';
 import { generateCitations } from '../services/geminiService';
 import { calculatePrismaCounts } from '../utils/prismaUtils';
 import PrismaDiagram from '../components/PrismaDiagram';
@@ -11,14 +11,15 @@ Chart.register(BarController, BarElement, CategoryScale, LinearScale);
 interface ExportPageProps {
   papers: Paper[];
   searchLog: SearchLogEntry[];
-  draft: Record<DraftSection, string>;
+  draft: Record<string, string>;
   projectTitle: string;
+  reportStructure: string;
   onBack: () => void;
   model: string;
   duplicateCount: number;
 }
 
-const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, projectTitle, onBack, model, duplicateCount }) => {
+const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, projectTitle, reportStructure, onBack, model, duplicateCount }) => {
   const [citationStyle, setCitationStyle] = useState<CitationStyle>(CitationStyle.APA);
   const [citations, setCitations] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -59,27 +60,22 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
     });
   }, [papers]);
 
-  const fullText = `
-# ${projectTitle}
+  const sections = useMemo(() => {
+    const lines = (reportStructure || DefaultDraftSections.join('\n'))
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+    return lines.length > 0 ? lines : [...DefaultDraftSections];
+  }, [reportStructure]);
 
-## Abstract
-${draft.Abstract}
-
-## Introduction
-${draft.Introduction}
-
-## Methods
-${draft.Methods}
-
-## Results
-${draft.Results}
-
-## Discussion
-${draft.Discussion}
-
-## References
-${citations}
-  `.trim();
+  const fullText = useMemo(() => {
+    const parts = [`# ${projectTitle}`];
+    sections.forEach(sec => {
+      parts.push(`## ${sec}`, draft[sec] || '');
+    });
+    parts.push('## References', citations);
+    return parts.join('\n\n').trim();
+  }, [projectTitle, sections, draft, citations]);
 
   const handleGenerateCitations = useCallback(async () => {
     const papersToCite = papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP);

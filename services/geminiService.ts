@@ -16,6 +16,7 @@ const logGemini = (entry: GeminiLogEntry) => {
         const logs: GeminiLogEntry[] = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
         logs.push(entry);
         localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+        window.dispatchEvent(new Event('geminiLog'));
     } catch (err) {
         console.warn('Failed to write Gemini log', err);
     }
@@ -187,22 +188,24 @@ export const generateStructuredSummary = async (paper: Paper, modelName: string,
 
 export const generateDraftSection = async (section: DraftSection, content: string | Summary[], modelName: string, focus?: string): Promise<string> => {
     let prompt;
-    switch(section) {
-        case DraftSection.INTRODUCTION:
+    switch(section.toLowerCase()) {
+        case 'introduction':
             prompt = `Write a compelling introduction for a systematic review titled "${content}". Lay out the research context and state the primary objectives.`;
             break;
-        case DraftSection.METHODS:
+        case 'methods':
             prompt = `Based on the following summaries, write a 'Methods' section for a systematic review. Describe the search strategy, inclusion/exclusion criteria, and data extraction process. ${focus ? `Give special consideration to ${focus}.` : ''} The summaries are:\n\n${JSON.stringify(content)}`;
             break;
-        case DraftSection.RESULTS:
+        case 'results':
             prompt = `Synthesize the 'Key Findings' from the following paper summaries into a coherent 'Results' section. Group findings thematically if possible. ${focus ? `Highlight aspects related to ${focus}.` : ''}\n\n${JSON.stringify(content)}`;
             break;
-        case DraftSection.DISCUSSION:
+        case 'discussion':
             prompt = `Write a 'Discussion' section based on the following summaries. Interpret the results, discuss implications, mention limitations, and suggest future research directions. ${focus ? `Discuss how the findings relate to ${focus}.` : ''}\n\n${JSON.stringify(content)}`;
             break;
-        case DraftSection.ABSTRACT:
+        case 'abstract':
              prompt = `Write a structured abstract (Background, Methods, Results, Conclusion) for a systematic review. The main content is as follows:\n\n${content}`;
              break;
+        default:
+             prompt = `Write the section titled '${section}' for a systematic review using the following content:\n\n${typeof content === 'string' ? content : JSON.stringify(content)}`;
     }
 
     try {

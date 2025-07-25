@@ -1,36 +1,39 @@
-import React, { useState } from 'react';
-import { Summary, DraftSection, ProjectDetails } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Summary, ProjectDetails, DefaultDraftSections } from '../types';
 import { generateDraftSection } from '../services/geminiService';
 import { SparklesIcon } from '../components/Icons';
 
 interface DraftingPageProps {
   summaries: Summary[];
-  draft: Record<DraftSection, string>;
-  setDraft: React.Dispatch<React.SetStateAction<Record<DraftSection, string>>>;
+  draft: Record<string, string>;
+  setDraft: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   onComplete: () => void;
   onBack: () => void;
   projectDetails: ProjectDetails;
   model: string;
 }
 
-const TABS: DraftSection[] = [
-    DraftSection.INTRODUCTION,
-    DraftSection.METHODS,
-    DraftSection.RESULTS,
-    DraftSection.DISCUSSION,
-    DraftSection.ABSTRACT,
-];
-
 const DraftingPage: React.FC<DraftingPageProps> = ({ summaries, draft, setDraft, onComplete, onBack, projectDetails, model }) => {
-  const [activeTab, setActiveTab] = useState<DraftSection>(DraftSection.INTRODUCTION);
-  const [loadingSection, setLoadingSection] = useState<DraftSection | null>(null);
+  const sections = useMemo(() => {
+    const lines = (projectDetails.reportStructure || DefaultDraftSections.join('\n'))
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+    return lines.length > 0 ? lines : [...DefaultDraftSections];
+  }, [projectDetails.reportStructure]);
 
-  const handleRegenerate = async (section: DraftSection) => {
+  const [activeTab, setActiveTab] = useState<string>(sections[0]);
+  useEffect(() => {
+    setActiveTab(sections[0]);
+  }, [sections]);
+  const [loadingSection, setLoadingSection] = useState<string | null>(null);
+
+  const handleRegenerate = async (section: string) => {
     setLoadingSection(section);
     let content: string | Summary[];
-    if (section === DraftSection.INTRODUCTION) {
+    if (section.toLowerCase() === 'introduction') {
         content = projectDetails.title;
-    } else if (section === DraftSection.ABSTRACT) {
+    } else if (section.toLowerCase() === 'abstract') {
         // Combine other sections for the abstract context
         content = `Introduction: ${draft.Introduction}\nMethods: ${draft.Methods}\nResults: ${draft.Results}\nDiscussion: ${draft.Discussion}`;
     }
@@ -48,7 +51,7 @@ const DraftingPage: React.FC<DraftingPageProps> = ({ summaries, draft, setDraft,
     }
   };
 
-  const handleTextChange = (section: DraftSection, text: string) => {
+  const handleTextChange = (section: string, text: string) => {
     setDraft(prev => ({...prev, [section]: text}));
   };
 
@@ -65,7 +68,7 @@ const DraftingPage: React.FC<DraftingPageProps> = ({ summaries, draft, setDraft,
       <div className="my-6">
         <div className="border-b border-gray-200 dark:border-primary-700">
             <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-              {TABS.map((tab) => (
+              {sections.map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}

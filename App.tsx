@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { AppStep, Paper, ProjectDetails, ScreeningDecision, Summary, DraftSection, SearchLogEntry } from './types';
+import { AppStep, Paper, ProjectDetails, ScreeningDecision, Summary, SearchLogEntry, DefaultDraftSections } from './types';
 import SetupPage from './pages/SetupPage';
 import ProjectPage from './pages/ProjectPage';
 import ScreeningPage from './pages/ScreeningPage';
@@ -14,6 +14,8 @@ export default function App() {
   const [currentStep, setCurrentStep] = useState<AppStep>(AppStep.SETUP);
   const [model, setModel] = useState<string>('gemini-2.5-pro');
   const [testing, setTesting] = useState<boolean>(false);
+
+  const [tokenCount, setTokenCount] = useState<number>(0);
   
   const [projectDetails, setProjectDetails] = useState<ProjectDetails>({
     title: '',
@@ -35,13 +37,9 @@ export default function App() {
   const [duplicateCount, setDuplicateCount] = useState(0);
 
   const [summaries, setSummaries] = useState<Summary[]>([]);
-  const [draft, setDraft] = useState<Record<DraftSection, string>>({
-    [DraftSection.INTRODUCTION]: '',
-    [DraftSection.METHODS]: '',
-    [DraftSection.RESULTS]: '',
-    [DraftSection.DISCUSSION]: '',
-    [DraftSection.ABSTRACT]: '',
-  });
+  const initDraft: Record<string, string> = {};
+  DefaultDraftSections.forEach(sec => { initDraft[sec] = ''; });
+  const [draft, setDraft] = useState<Record<string, string>>(initDraft);
 
   const [hasSnapshot, setHasSnapshot] = useState(false);
 
@@ -70,6 +68,37 @@ export default function App() {
     }, 60000);
     return () => clearInterval(id);
   }, [projectDetails, papers, currentStep]);
+
+  // update draft structure when reportStructure changes
+  useEffect(() => {
+    const sections = (projectDetails.reportStructure || DefaultDraftSections.join('\n'))
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+    setDraft(prev => {
+      const updated: Record<string, string> = {};
+      sections.forEach(sec => {
+        updated[sec] = prev[sec] || '';
+      });
+      return updated;
+    });
+  }, [projectDetails.reportStructure]);
+
+  // update token count whenever Gemini logs are written
+  useEffect(() => {
+    const update = () => {
+      try {
+        const logs = JSON.parse(localStorage.getItem('gemini_logs') || '[]');
+        const total = logs.reduce((a: number, b: any) => a + (b.tokens || 0), 0);
+        setTokenCount(total);
+      } catch {
+        setTokenCount(0);
+      }
+    };
+    update();
+    window.addEventListener('geminiLog', update);
+    return () => window.removeEventListener('geminiLog', update);
+  }, []);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
@@ -137,7 +166,7 @@ export default function App() {
       case AppStep.DRAFTING:
         return <DraftingPage summaries={summaries} draft={draft} setDraft={setDraft} onComplete={() => setCurrentStep(AppStep.EXPORT)} onBack={handleBack} projectDetails={projectDetails} model={model} />;
       case AppStep.EXPORT:
-        return <ExportPage papers={papers} searchLog={searchLog} draft={draft} projectTitle={projectDetails.title} onBack={handleBack} model={model} duplicateCount={duplicateCount} />;
+        return <ExportPage papers={papers} searchLog={searchLog} draft={draft} projectTitle={projectDetails.title} reportStructure={projectDetails.reportStructure || ''} onBack={handleBack} model={model} duplicateCount={duplicateCount} />;
       default:
         return <SetupPage
           onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)}
@@ -157,13 +186,16 @@ export default function App() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <h1 className="text-xl font-bold text-primary-700 dark:text-primary-400">AutoReview</h1>
-            <button
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-slate-600 dark:text-primary-300">Tokens: {tokenCount}</span>
+              <button
               onClick={toggleTheme}
               className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-primary-800 text-slate-500 dark:text-primary-400"
               aria-label="Toggle theme"
             >
               {theme === 'light' ? <MoonIcon className="w-6 h-6" /> : <SunIcon className="w-6 h-6" />}
-            </button>
+              </button>
+            </div>
           </div>
         </div>
       </header>
