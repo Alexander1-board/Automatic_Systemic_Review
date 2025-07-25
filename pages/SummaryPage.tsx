@@ -111,6 +111,10 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummari
         >
             Back
         </button>
+        <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 text-sm text-primary-600">Re-run Search</button>
         <button onClick={onComplete} disabled={isLoading || summaries.length !== papers.length} className="flex-grow flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-slate-400 disabled:cursor-not-allowed">
           Next: Draft Review
         </button>

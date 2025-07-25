@@ -29,6 +29,36 @@ export interface ProjectDetails {
   description: string;
   searchTerms: string;
   queryVariants: string[];
+  useUnpaywall?: boolean;
+  useOpenAlt?: boolean;
+  searchProfiles?: SearchProfile[];
+  activeProfileId?: string;
+  sourceFilters?: Record<string, SourceSetting>;
+}
+
+export interface SourceSetting {
+  enabled: boolean;
+  yearFrom?: number;
+  yearTo?: number;
+  language?: string;
+  docType?: string;
+}
+
+export interface SearchParams {
+  query: string;
+  limit?: number;
+  yearFrom?: number;
+  yearTo?: number;
+  language?: string;
+  docType?: string;
+  cursor?: string;
+}
+
+export interface SearchProfile {
+  id: string;
+  name: string;
+  searchTerms: string;
+  sourceFilters: Record<string, SourceSetting>;
 }
 
 export interface Paper {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ProjectDetails, Paper, SearchLogEntry } from '../types';
+import { ProjectDetails, Paper, SearchLogEntry, SearchProfile } from '../types';
 import ProjectPreviewCard from '../components/ProjectPreviewCard';
 import { performSearch } from '../services/searchService';
 import { developSearchStrategy } from '../services/geminiService';
@@ -15,13 +15,28 @@ interface ProjectPageProps {
   onBack: () => void;
   model: string;
   searchLog: SearchLogEntry[];
+  testing: boolean;
 }
 
-const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDetails, setPapers, setSearchLog, setDuplicateCount, onStartSearch, onBack, model, searchLog }) => {
+const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDetails, setPapers, setSearchLog, setDuplicateCount, onStartSearch, onBack, model, searchLog, testing }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [strategyDeveloped, setStrategyDeveloped] = useState(false);
   const [recommendedDatabases, setRecommendedDatabases] = useState<string[]>([]);
+
+  const handleSaveProfile = () => {
+    const newProfile: SearchProfile = {
+      id: Date.now().toString(),
+      name: `Profile ${projectDetails.searchProfiles?.length ?? 0 + 1}`,
+      searchTerms: projectDetails.searchTerms,
+      sourceFilters: {},
+    };
+    setProjectDetails(prev => ({
+      ...prev,
+      searchProfiles: [...(prev.searchProfiles || []), newProfile],
+      activeProfileId: newProfile.id,
+    }));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setProjectDetails(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -56,7 +71,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
     setIsProcessing(true);
     setLoadingMessage("Performing literature search across recommended databases...");
     try {
-      const { papers, searchLog, duplicateCount } = await performSearch(projectDetails, recommendedDatabases);
+      const { papers, searchLog, duplicateCount } = await performSearch(projectDetails, recommendedDatabases, testing ? 10 : undefined);
       setPapers(papers);
       setSearchLog(searchLog);
       setDuplicateCount(duplicateCount);
@@ -107,7 +122,16 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
           </div>
 
           <div>
-            <label htmlFor="searchTerms" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Boolean Term Suggestions</label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="searchTerms" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Boolean Term Suggestions</label>
+              <button type="button" onClick={handleSaveProfile} className="text-xs text-primary-600">Save as Profile</button>
+            </div>
+            {projectDetails.searchProfiles && projectDetails.searchProfiles.length > 0 && (
+              <select className="mt-1 block w-full border rounded" value={projectDetails.activeProfileId || ''} onChange={e => setProjectDetails(prev => ({ ...prev, activeProfileId: e.target.value }))}>
+                <option value="">Current</option>
+                {projectDetails.searchProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            )}
             <textarea name="searchTerms" id="searchTerms" rows={4} value={projectDetails.searchTerms} onChange={handleChange} disabled={strategyDeveloped} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 font-mono text-sm disabled:bg-slate-100 dark:disabled:bg-primary-800/50" placeholder='e.g. ("myocardial infarction" OR "heart attack") AND (prevention OR therapy)'></textarea>
             {strategyDeveloped && <p className="mt-1 text-xs text-slate-500 dark:text-primary-400">Query has been finalized by the AI. To change it, you must go back and restart this step.</p>}
           </div>

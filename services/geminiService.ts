@@ -49,7 +49,7 @@ const strategySchema = {
         },
         recommendedDatabases: {
             type: Type.ARRAY,
-            items: { type: Type.STRING, enum: ["PubMed", "Crossref", "OpenAlex"] },
+            items: { type: Type.STRING, enum: ["PubMed", "Crossref", "OpenAlex", "arXiv", "SemanticScholar", "ERIC", "BASE", "NASA ADS", "DataCite", "WHO GIM/LILACS", "DBLP"] },
             description: "A list of recommended databases from the available options based on topic relevance."
         }
     },
@@ -94,7 +94,7 @@ export const developSearchStrategy = async (
     const prompt = `
         Act as an expert systematic review researcher. Your task is to develop a comprehensive search strategy based on the user's input.
         
-        Available databases for searching are: "PubMed", "Crossref", "OpenAlex".
+        Available databases for searching are: "PubMed", "Crossref", "OpenAlex", "arXiv", "SemanticScholar", "ERIC", "BASE", "NASA ADS", "DataCite", "WHO GIM/LILACS", "DBLP".
 
         User's input:
         - Research Question/Description: "${description}"
@@ -123,7 +123,7 @@ export const developSearchStrategy = async (
             suggestedTitle: "Error: Could not generate title",
             finalizedQuery: termSuggestions,
             queryVariants: [],
-            recommendedDatabases: ["PubMed", "Crossref", "OpenAlex"]
+            recommendedDatabases: ["PubMed", "Crossref", "OpenAlex", "arXiv", "SemanticScholar", "ERIC", "BASE", "NASA ADS", "DataCite", "WHO GIM/LILACS", "DBLP"]
         };
     }
 };

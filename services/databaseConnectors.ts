@@ -1,4 +1,4 @@
-import { Paper } from '../types';
+import { Paper, SearchParams } from '../types';
 
 const APP_EMAIL = "autoreview-user@example.com"; // Polite API usage
 
@@ -122,8 +122,11 @@ const fetchPubMedAbstracts = async (idList: string[]): Promise<Map<string, strin
 };
 
 
-export const searchCrossref = async (query: string): Promise<Paper[]> => {
-    const url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(query)}&rows=50&mailto=${APP_EMAIL}`;
+export const searchCrossref = async (params: SearchParams): Promise<Paper[]> => {
+    const query = params.query;
+    let url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(query)}&rows=${params.limit || 50}&mailto=${APP_EMAIL}`;
+    if (params.yearFrom) url += `&filter=from-pub-date:${params.yearFrom}`;
+    if (params.yearTo) url += `${params.yearFrom ? ',' : '&filter='}until-pub-date:${params.yearTo}`;
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Crossref API error: ${response.statusText}`);
@@ -136,8 +139,9 @@ export const searchCrossref = async (query: string): Promise<Paper[]> => {
     }
 };
 
-export const searchPubMed = async (query: string): Promise<Paper[]> => {
-    const eSearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=50&retmode=json`;
+export const searchPubMed = async (params: SearchParams): Promise<Paper[]> => {
+    const query = params.query;
+    const eSearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${params.limit || 50}&retmode=json`;
     try {
         const searchResponse = await fetch(eSearchUrl);
         if (!searchResponse.ok) throw new Error(`PubMed ESearch API error: ${searchResponse.statusText}`);
@@ -176,8 +180,9 @@ export const searchPubMed = async (query: string): Promise<Paper[]> => {
     }
 };
 
-export const searchOpenAlex = async (query: string): Promise<Paper[]> => {
-    const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=50&mailto=${APP_EMAIL}`;
+export const searchOpenAlex = async (params: SearchParams): Promise<Paper[]> => {
+    const query = params.query;
+    let url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${params.limit || 50}&mailto=${APP_EMAIL}`;
     try {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`OpenAlex API error: ${response.statusText}`);
@@ -188,4 +193,89 @@ export const searchOpenAlex = async (query: string): Promise<Paper[]> => {
         console.error("Failed to fetch from OpenAlex:", error);
         return [];
     }
+};
+
+export const searchArxiv = async (params: SearchParams): Promise<Paper[]> => {
+    const query = params.query;
+    const url = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${params.limit || 50}`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`arXiv API error: ${response.statusText}`);
+        const text = await response.text();
+        const entries = text.split('<entry>').slice(1);
+        const papers: Paper[] = entries.map(entry => {
+            const idMatch = entry.match(/<id>(.*?)<\/id>/);
+            const titleMatch = entry.match(/<title>([\s\S]*?)<\/title>/);
+            const summaryMatch = entry.match(/<summary>([\s\S]*?)<\/summary>/);
+            const authorMatches = Array.from(entry.matchAll(/<name>(.*?)<\/name>/g));
+            const authors = authorMatches.map(m => m[1]);
+            const yearMatch = entry.match(/<published>(\d{4})/);
+            if (!titleMatch) return null;
+            return {
+                id: idMatch ? idMatch[1] : `arxiv-${Math.random()}`,
+                title: titleMatch[1].replace(/\n+/g, ' ').trim(),
+                authors,
+                year: yearMatch ? parseInt(yearMatch[1],10) : 0,
+                source: 'arXiv',
+                abstract: summaryMatch ? summaryMatch[1].replace(/\n+/g, ' ').trim() : '',
+                fullTextUrl: idMatch ? idMatch[1] : '',
+                dbSource: 'arXiv',
+                searchDate: new Date().toISOString(),
+            } as Paper;
+        }).filter((p): p is Paper => p !== null);
+        return papers;
+    } catch (error) {
+        console.error('Failed to fetch from arXiv:', error);
+        return [];
+    }
+};
+
+export const searchSemanticScholar = async (params: SearchParams): Promise<Paper[]> => {
+    const query = params.query;
+    const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=${params.limit || 50}&fields=title,authors,year,venue,url,abstract`;
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`SemanticScholar API error: ${response.statusText}`);
+        const data = await response.json();
+        const papers: Paper[] = data.data?.map((item: any) => ({
+            id: item.paperId,
+            title: item.title,
+            authors: item.authors?.map((a: any) => a.name) || [],
+            year: item.year || 0,
+            source: item.venue || 'Semantic Scholar',
+            abstract: item.abstract || '',
+            fullTextUrl: item.url || '',
+            dbSource: 'SemanticScholar',
+            searchDate: new Date().toISOString(),
+        })) || [];
+        return papers;
+    } catch (error) {
+        console.error('Failed to fetch from Semantic Scholar:', error);
+        return [];
+    }
+};
+
+// Additional data sources - basic stubs returning empty results
+export const searchEric = async (_params: SearchParams): Promise<Paper[]> => {
+    return [];
+};
+
+export const searchBASE = async (_params: SearchParams): Promise<Paper[]> => {
+    return [];
+};
+
+export const searchNASAADS = async (_params: SearchParams): Promise<Paper[]> => {
+    return [];
+};
+
+export const searchDataCite = async (_params: SearchParams): Promise<Paper[]> => {
+    return [];
+};
+
+export const searchWHOLILACS = async (_params: SearchParams): Promise<Paper[]> => {
+    return [];
+};
+
+export const searchDBLP = async (_params: SearchParams): Promise<Paper[]> => {
+    return [];
 };

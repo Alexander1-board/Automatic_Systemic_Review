@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AppStep, Paper, ProjectDetails, ScreeningDecision, Summary, DraftSection, SearchLogEntry } from './types';
 import SetupPage from './pages/SetupPage';
 import ProjectPage from './pages/ProjectPage';
@@ -13,13 +13,27 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [currentStep, setCurrentStep] = useState<AppStep>(AppStep.SETUP);
   const [model, setModel] = useState<string>('gemini-2.5-pro');
+  const [testing, setTesting] = useState<boolean>(false);
   
   const [projectDetails, setProjectDetails] = useState<ProjectDetails>({
     title: '',
     description: '',
     searchTerms: '',
     queryVariants: [],
+    useUnpaywall: true,
+    useOpenAlt: false,
+    searchProfiles: [],
+    activeProfileId: undefined,
+    sourceFilters: {},
   });
+
+  const setUseUnpaywall = (val: boolean) => {
+    setProjectDetails(prev => ({ ...prev, useUnpaywall: val }));
+  };
+
+  const setUseOpenAlt = (val: boolean) => {
+    setProjectDetails(prev => ({ ...prev, useOpenAlt: val }));
+  };
 
   const [papers, setPapers] = useState<Paper[]>([]);
   const [searchLog, setSearchLog] = useState<SearchLogEntry[]>([]);
@@ -33,6 +47,27 @@ export default function App() {
     [DraftSection.DISCUSSION]: '',
     [DraftSection.ABSTRACT]: '',
   });
+
+  // restore snapshot
+  useEffect(() => {
+    const snap = localStorage.getItem('snapshot');
+    if (snap) {
+      try {
+        const data = JSON.parse(snap);
+        setProjectDetails(data.projectDetails || projectDetails);
+        setPapers(data.papers || []);
+        setCurrentStep(data.currentStep || AppStep.SETUP);
+      } catch {}
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const snap = { projectDetails, papers, currentStep };
+      localStorage.setItem('snapshot', JSON.stringify(snap));
+    }, 60000);
+    return () => clearInterval(id);
+  }, [projectDetails, papers, currentStep]);
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
@@ -71,18 +106,19 @@ export default function App() {
   const renderStep = () => {
     switch (currentStep) {
       case AppStep.SETUP:
-        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} />;
+        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} testing={testing} setTesting={setTesting} useUnpaywall={projectDetails.useUnpaywall ?? true} setUseUnpaywall={setUseUnpaywall} useOpenAlt={projectDetails.useOpenAlt ?? false} setUseOpenAlt={setUseOpenAlt} projectDetails={projectDetails} setProjectDetails={setProjectDetails} />;
       case AppStep.PROJECT_DEFINITION:
-        return <ProjectPage 
-            projectDetails={projectDetails} 
-            setProjectDetails={setProjectDetails} 
-            setPapers={setPapers} 
-            setSearchLog={setSearchLog} 
+        return <ProjectPage
+            projectDetails={projectDetails}
+            setProjectDetails={setProjectDetails}
+            setPapers={setPapers}
+            setSearchLog={setSearchLog}
             setDuplicateCount={setDuplicateCount}
-            onStartSearch={() => setCurrentStep(AppStep.SCREENING)} 
-            onBack={handleBack} 
+            onStartSearch={() => setCurrentStep(AppStep.SCREENING)}
+            onBack={handleBack}
             model={model}
             searchLog={searchLog}
+            testing={testing}
         />;
       case AppStep.SCREENING:
         return <ScreeningPage papers={papers} setPapers={setPapers} projectDetails={projectDetails} onComplete={() => setCurrentStep(AppStep.SUMMARY_GENERATION)} onBack={handleBack} model={model} />;
@@ -93,7 +129,7 @@ export default function App() {
       case AppStep.EXPORT:
         return <ExportPage papers={papers} searchLog={searchLog} draft={draft} projectTitle={projectDetails.title} onBack={handleBack} model={model} duplicateCount={duplicateCount} />;
       default:
-        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} />;
+        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} testing={testing} setTesting={setTesting} useUnpaywall={projectDetails.useUnpaywall ?? true} setUseUnpaywall={setUseUnpaywall} useOpenAlt={projectDetails.useOpenAlt ?? false} setUseOpenAlt={setUseOpenAlt} projectDetails={projectDetails} setProjectDetails={setProjectDetails} />;
     }
   };
 

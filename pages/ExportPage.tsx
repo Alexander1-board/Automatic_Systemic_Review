@@ -1,8 +1,12 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { Chart, BarController, BarElement, CategoryScale, LinearScale } from 'chart.js';
+import JSZip from 'jszip';
 import { Paper, DraftSection, CitationStyle, SearchLogEntry, PrismaCounts, ScreeningDecision } from '../types';
 import { generateCitations } from '../services/geminiService';
 import { calculatePrismaCounts } from '../utils/prismaUtils';
 import PrismaDiagram from '../components/PrismaDiagram';
+
+Chart.register(BarController, BarElement, CategoryScale, LinearScale);
 
 interface ExportPageProps {
   papers: Paper[];
@@ -18,10 +22,37 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
   const [citationStyle, setCitationStyle] = useState<CitationStyle>(CitationStyle.APA);
   const [citations, setCitations] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [autoExport, setAutoExport] = useState(false);
+
+  const diagnostics = useMemo(() => {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('timing_'));
+    return keys.map(k => {
+      const arr = JSON.parse(localStorage.getItem(k) || '[]');
+      const avg = arr.reduce((a:number,b:number)=>a+b,0) / (arr.length || 1);
+      return { db: k.replace('timing_',''), avg };
+    });
+  }, []);
 
   const prismaCounts: PrismaCounts = useMemo(() => {
     return calculatePrismaCounts(papers, searchLog, duplicateCount);
   }, [papers, searchLog, duplicateCount]);
+
+  const chartRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const ctx = chartRef.current.getContext('2d');
+    if (!ctx) return;
+    const data = papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP).reduce((acc:any,p) => {
+      acc[p.dbSource] = (acc[p.dbSource] || 0) + 1;
+      return acc;
+    }, {} as Record<string,number>);
+    new Chart(ctx, {
+      type: 'bar',
+      data: { labels: Object.keys(data), datasets: [{ label: 'Included', data: Object.values(data), backgroundColor: '#3b82f6' }] },
+      options: { responsive: false }
+    });
+  }, [papers]);
 
   const fullText = `
 # ${projectTitle}
@@ -74,6 +105,34 @@ ${citations}
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
+
+  const downloadAsRIS = () => {
+    const lines = papers.filter(p => p.fullTextDecision === ScreeningDecision.KEEP).map(p => `TY  - JOUR\nTI  - ${p.title}\nAU  - ${p.authors.join('; ')}\nPY  - ${p.year}\nUR  - ${p.fullTextUrl}\nER  -`);
+    const blob = new Blob([lines.join('\n')], { type: 'application/x-research-info-systems' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${projectTitle.replace(/\s+/g, '_')}.ris`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadZip = async () => {
+    const zip = new JSZip();
+    zip.file('review.txt', fullText);
+    zip.file('citations.ris', papers.map(p => p.title).join('\n'));
+    const content = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectTitle.replace(/\s+/g, '_')}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   
   const downloadSearchLog = () => {
     const header = "Database,Query,Hits,Date\n";
@@ -91,6 +150,13 @@ ${citations}
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }
+
+  useEffect(() => {
+    if (autoExport && citations) {
+      downloadAsTxt();
+      downloadSearchLog();
+    }
+  }, [autoExport, citations]);
 
   return (
     <div className="space-y-8">
@@ -110,6 +176,7 @@ ${citations}
           </div>
           <div className="mt-6 p-4 flex justify-center bg-slate-50 dark:bg-black rounded-lg">
             <PrismaDiagram counts={prismaCounts} />
+            <canvas id="sourceChart" className="ml-8" width="300" height="200" ref={chartRef}></canvas>
           </div>
       </div>
       
@@ -170,10 +237,15 @@ ${citations}
             <textarea readOnly value={citations} rows={10} className="mt-1 block w-full rounded-md border-slate-300 bg-slate-50 dark:bg-primary-950 dark:border-primary-700 shadow-sm sm:text-sm" placeholder="Generated citations will appear here..."/>
             <div>
               <h3 className="text-lg font-semibold">Download</h3>
-              <p className="text-sm text-slate-500 dark:text-primary-400 mt-1">Download the complete review as a text file.</p>
+              <p className="text-sm text-slate-500 dark:text-primary-400 mt-1">Download the complete review.</p>
               <button onClick={downloadAsTxt} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
                   Download .txt
               </button>
+              <button onClick={downloadAsRIS} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">Download .ris</button>
+              <button onClick={downloadZip} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">Download ZIP</button>
+              <label className="mt-2 flex items-center text-sm">
+                <input type="checkbox" className="mr-2" checked={autoExport} onChange={e => setAutoExport(e.target.checked)} /> Auto-export on finish
+              </label>
             </div>
           </div>
           <div className="md:col-span-2">
@@ -183,6 +255,16 @@ ${citations}
               </div>
           </div>
         </div>
+        {diagnostics.length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold">Diagnostics</h3>
+            <ul className="mt-2 text-sm list-disc pl-6">
+              {diagnostics.map(d => (
+                <li key={d.db}>{d.db}: avg {d.avg.toFixed(0)} ms</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

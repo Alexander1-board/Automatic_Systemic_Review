@@ -1,4 +1,4 @@
-import React, { Fragment } from 'react';
+import React, { useState } from 'react';
 import { Paper } from '../types';
 import { XMarkIcon } from './Icons';
 
@@ -9,6 +9,10 @@ interface ModalProps {
 }
 
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, paper }) => {
+    const [draft, setDraft] = useState<Paper | null>(paper);
+    React.useEffect(() => {
+        setDraft(paper);
+    }, [paper]);
     if (!isOpen || !paper) return null;
 
     return (
@@ -21,11 +25,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, paper }) => {
                         <div className="bg-white dark:bg-primary-900 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                             <div className="sm:flex sm:items-start">
                                 <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                                    <h3 className="text-lg font-semibold leading-6 text-slate-900 dark:text-primary-100" id="modal-title">
-                                        {paper.title}
-                                    </h3>
-                                    <div className="mt-2">
-                                        <p className="text-sm text-slate-600 dark:text-primary-400">{paper.authors.join(", ")} ({paper.year}) - <em>{paper.source}</em></p>
+                                    <div className="space-y-2">
+                                        <input className="w-full border rounded p-1" value={draft?.title || ''} onChange={e => setDraft(d => d ? { ...d, title: e.target.value } : d)} />
+                                        <input className="w-full border rounded p-1" value={draft?.year || ''} onChange={e => setDraft(d => d ? { ...d, year: parseInt(e.target.value) || 0 } : d)} />
+                                        <input className="w-full border rounded p-1" value={draft?.id || ''} onChange={e => setDraft(d => d ? { ...d, id: e.target.value } : d)} />
                                     </div>
                                     <div className="mt-4 prose dark:prose-invert max-w-none">
                                         {paper.oaPdfUrl && (
@@ -41,7 +44,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, paper }) => {
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-slate-50 dark:bg-primary-900/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                        <div className="bg-slate-50 dark:bg-primary-900/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-2">
+                            <button type="button" className="inline-flex justify-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700 sm:w-auto" onClick={() => { if(draft) Object.assign(paper, draft); onClose(); }}>Save</button>
                             <button
                                 type="button"
                                 className="mt-3 inline-flex w-full justify-center rounded-md bg-white dark:bg-primary-800 px-3 py-2 text-sm font-semibold text-slate-900 dark:text-primary-200 shadow-sm ring-1 ring-inset ring-slate-300 dark:ring-primary-700 hover:bg-slate-50 dark:hover:bg-primary-700 sm:mt-0 sm:w-auto"
