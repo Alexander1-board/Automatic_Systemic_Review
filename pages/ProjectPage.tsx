@@ -141,6 +141,11 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
             <textarea name="searchTerms" id="searchTerms" rows={4} value={projectDetails.searchTerms} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 font-mono text-sm" placeholder='e.g. ("myocardial infarction" OR "heart attack") AND (prevention OR therapy)'></textarea>
           </div>
 
+          <div>
+            <label htmlFor="analysisFocus" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Analysis Focus (optional)</label>
+            <textarea name="analysisFocus" id="analysisFocus" rows={2} value={projectDetails.analysisFocus || ''} onChange={handleChange} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 text-sm" placeholder="e.g. compare interventions by indication" />
+          </div>
+
           {strategyDeveloped && (
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-primary-300">Select Databases</label>

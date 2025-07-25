@@ -21,6 +21,11 @@ const logGemini = (entry: GeminiLogEntry) => {
     }
 };
 
+const estimateTokens = (text: string) => {
+    if (!text) return 0;
+    return Math.ceil(text.trim().split(/\s+/).length);
+};
+
 const classificationSchema = {
     type: Type.OBJECT,
     properties: {
@@ -92,11 +97,13 @@ export const classifyPaperPart = async (part: 'title' | 'abstract' | 'full-text'
         });
         const jsonText = response.text.trim();
         const result = JSON.parse(jsonText);
-        logGemini({ timestamp: new Date().toISOString(), action: 'classify', stage: part, ms: performance.now() - start });
+        const tokens = estimateTokens(prompt) + estimateTokens(jsonText);
+        logGemini({ timestamp: new Date().toISOString(), action: 'classify', stage: part, ms: performance.now() - start, tokens });
         return result;
     } catch (error: any) {
         console.error(`Error classifying paper ${part}:`, error);
-        logGemini({ timestamp: new Date().toISOString(), action: 'classify', stage: part, ms: performance.now() - start, error: error?.message || String(error) });
+        const tokens = estimateTokens(prompt);
+        logGemini({ timestamp: new Date().toISOString(), action: 'classify', stage: part, ms: performance.now() - start, error: error?.message || String(error), tokens });
         return { decision: 'exclude', confidence: 0, justification: 'Error during analysis.' };
     }
 };
@@ -132,7 +139,8 @@ export const developSearchStrategy = async (
             }
         });
         const jsonText = response.text.trim();
-        logGemini({ timestamp: new Date().toISOString(), action: 'strategy', ms: performance.now() - start });
+        const tokens = estimateTokens(prompt) + estimateTokens(jsonText);
+        logGemini({ timestamp: new Date().toISOString(), action: 'strategy', ms: performance.now() - start, tokens });
         return JSON.parse(jsonText);
     } catch (error: any) {
         console.error("Error developing search strategy:", error);
@@ -147,12 +155,13 @@ export const developSearchStrategy = async (
 };
 
 
-export const generateStructuredSummary = async (paper: Paper, modelName: string): Promise<Omit<Summary, 'paperId' | 'paperTitle'>> => {
+export const generateStructuredSummary = async (paper: Paper, modelName: string, focus?: string): Promise<Omit<Summary, 'paperId' | 'paperTitle'>> => {
     const prompt = `
         Generate a structured summary of the following paper's abstract. If abstract is empty, use the title.
         Title: "${paper.title}"
         Abstract: "${paper.abstract}"
         Focus on these four areas: Methodology, Key Findings, Research Context, and Conclusions.
+        ${focus ? `Pay particular attention to ${focus}.` : ''}
     `;
     const start = performance.now();
     try {
@@ -165,29 +174,31 @@ export const generateStructuredSummary = async (paper: Paper, modelName: string)
             }
         });
         const jsonText = response.text.trim();
-        logGemini({ timestamp: new Date().toISOString(), action: 'summary', paperId: paper.id, ms: performance.now() - start });
+        const tokens = estimateTokens(prompt) + estimateTokens(jsonText);
+        logGemini({ timestamp: new Date().toISOString(), action: 'summary', paperId: paper.id, ms: performance.now() - start, tokens });
         return JSON.parse(jsonText);
     } catch (error: any) {
         console.error("Error generating structured summary:", error);
-        logGemini({ timestamp: new Date().toISOString(), action: 'summary', paperId: paper.id, ms: performance.now() - start, error: error?.message || String(error) });
+        const tokens = estimateTokens(prompt);
+        logGemini({ timestamp: new Date().toISOString(), action: 'summary', paperId: paper.id, ms: performance.now() - start, error: error?.message || String(error), tokens });
         return { methodology: 'Error', keyFindings: 'Error', researchContext: 'Error', conclusions: 'Error' };
     }
 };
 
-export const generateDraftSection = async (section: DraftSection, content: string | Summary[], modelName: string): Promise<string> => {
+export const generateDraftSection = async (section: DraftSection, content: string | Summary[], modelName: string, focus?: string): Promise<string> => {
     let prompt;
     switch(section) {
         case DraftSection.INTRODUCTION:
             prompt = `Write a compelling introduction for a systematic review titled "${content}". Lay out the research context and state the primary objectives.`;
             break;
         case DraftSection.METHODS:
-            prompt = `Based on the following summaries, write a 'Methods' section for a systematic review. Describe the search strategy, inclusion/exclusion criteria, and data extraction process. The summaries are:\n\n${JSON.stringify(content)}`;
+            prompt = `Based on the following summaries, write a 'Methods' section for a systematic review. Describe the search strategy, inclusion/exclusion criteria, and data extraction process. ${focus ? `Give special consideration to ${focus}.` : ''} The summaries are:\n\n${JSON.stringify(content)}`;
             break;
         case DraftSection.RESULTS:
-            prompt = `Synthesize the 'Key Findings' from the following paper summaries into a coherent 'Results' section. Group findings thematically if possible.\n\n${JSON.stringify(content)}`;
+            prompt = `Synthesize the 'Key Findings' from the following paper summaries into a coherent 'Results' section. Group findings thematically if possible. ${focus ? `Highlight aspects related to ${focus}.` : ''}\n\n${JSON.stringify(content)}`;
             break;
         case DraftSection.DISCUSSION:
-            prompt = `Write a 'Discussion' section based on the following summaries. Interpret the results, discuss implications, mention limitations, and suggest future research directions.\n\n${JSON.stringify(content)}`;
+            prompt = `Write a 'Discussion' section based on the following summaries. Interpret the results, discuss implications, mention limitations, and suggest future research directions. ${focus ? `Discuss how the findings relate to ${focus}.` : ''}\n\n${JSON.stringify(content)}`;
             break;
         case DraftSection.ABSTRACT:
              prompt = `Write a structured abstract (Background, Methods, Results, Conclusion) for a systematic review. The main content is as follows:\n\n${content}`;
@@ -200,11 +211,13 @@ export const generateDraftSection = async (section: DraftSection, content: strin
             model: modelName,
             contents: prompt,
         });
-        logGemini({ timestamp: new Date().toISOString(), action: 'draft', stage: section, ms: performance.now() - start });
+        const tokens = estimateTokens(prompt) + estimateTokens(response.text);
+        logGemini({ timestamp: new Date().toISOString(), action: 'draft', stage: section, ms: performance.now() - start, tokens });
         return response.text;
     } catch (error: any) {
         console.error(`Error generating draft for ${section}:`, error);
-        logGemini({ timestamp: new Date().toISOString(), action: 'draft', stage: section, ms: performance.now() - start, error: error?.message || String(error) });
+        const tokens = estimateTokens(prompt);
+        logGemini({ timestamp: new Date().toISOString(), action: 'draft', stage: section, ms: performance.now() - start, error: error?.message || String(error), tokens });
         return `Error generating content for ${section}.`;
     }
 };
@@ -224,11 +237,13 @@ export const generateCitations = async (papers: Paper[], style: CitationStyle, m
             model: modelName,
             contents: prompt,
         });
-        logGemini({ timestamp: new Date().toISOString(), action: 'citations', ms: performance.now() - start });
+        const tokens = estimateTokens(prompt) + estimateTokens(response.text);
+        logGemini({ timestamp: new Date().toISOString(), action: 'citations', ms: performance.now() - start, tokens });
         return response.text;
     } catch (error: any) {
         console.error(`Error generating citations for style ${style}:`, error);
-        logGemini({ timestamp: new Date().toISOString(), action: 'citations', ms: performance.now() - start, error: error?.message || String(error) });
+        const tokens = estimateTokens(prompt);
+        logGemini({ timestamp: new Date().toISOString(), action: 'citations', ms: performance.now() - start, error: error?.message || String(error), tokens });
         return `Error generating citations.`;
     }
 }

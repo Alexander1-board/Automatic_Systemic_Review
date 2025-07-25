@@ -10,9 +10,10 @@ interface SummaryPageProps {
   onComplete: () => void;
   onBack: () => void;
   model: string;
+  analysisFocus: string;
 }
 
-const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummaries, onComplete, onBack, model }) => {
+const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummaries, onComplete, onBack, model, analysisFocus }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
@@ -26,7 +27,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ papers, summaries, setSummari
     let currentSummaries = [...summaries];
     for(let i=0; i<papersToSummarize.length; i++) {
         const paper = papersToSummarize[i];
-        const summaryData = await generateStructuredSummary(paper, model);
+        const summaryData = await generateStructuredSummary(paper, model, analysisFocus);
         currentSummaries.push({
             paperId: paper.id,
             paperTitle: paper.title,

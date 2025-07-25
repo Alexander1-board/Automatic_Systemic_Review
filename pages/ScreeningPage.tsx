@@ -30,8 +30,12 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
   const pauseRef = useRef(false);
   const workerRef = useRef<Worker>();
 
-  const getDecisionField = (stage: ScreeningStage) => `${stage}Decision` as keyof Paper;
-  const getReasonField = (stage: ScreeningStage) => `${stage}ExclusionReason` as keyof Paper;
+  const mapField = (stage: ScreeningStage, suffix: string) => {
+    if (stage === 'full-text') return `fullText${suffix}` as keyof Paper;
+    return `${stage}${suffix}` as keyof Paper;
+  };
+  const getDecisionField = (stage: ScreeningStage) => mapField(stage, 'Decision');
+  const getReasonField = (stage: ScreeningStage) => mapField(stage, 'ExclusionReason');
 
   const classifyAllPapersForStage = useCallback(async (stage: ScreeningStage) => {
     pauseRef.current = false;
@@ -89,12 +93,12 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
         const decision = classification.decision === 'keep' ? ScreeningDecision.KEEP : ScreeningDecision.EXCLUDE;
         updatedPapers[paperIndex] = {
           ...updatedPapers[paperIndex],
-          [`${stage}Decision`]: decision,
-          [`${stage}Confidence`]: classification.confidence,
-          [`${stage}Justification`]: classification.justification,
+          [getDecisionField(stage)]: decision,
+          [`${stage === 'full-text' ? 'fullText' : stage}Confidence`]: classification.confidence,
+          [`${stage === 'full-text' ? 'fullText' : stage}Justification`]: classification.justification,
           // If AI excludes, we can pre-fill a reason
-          [`${stage}ExclusionReason`]: decision === ScreeningDecision.EXCLUDE ? ExclusionReason.OTHER : undefined,
-        };
+          [getReasonField(stage)]: decision === ScreeningDecision.EXCLUDE ? ExclusionReason.OTHER : undefined,
+        } as Paper;
         // update local array only; apply to state once finished or paused
       }
       setProgress(((i + 1) / papersToClassify.length) * 100);

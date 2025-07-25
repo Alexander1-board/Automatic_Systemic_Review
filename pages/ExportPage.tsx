@@ -34,7 +34,8 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
     const aiLogs = JSON.parse(localStorage.getItem('gemini_logs') || '[]');
     const aiCount = aiLogs.length;
     const aiAvg = aiLogs.reduce((a:any,b:any)=>a+(b.ms||0),0) / (aiCount || 1);
-    return [...dbStats, { db: 'Gemini calls', avg: aiAvg, count: aiCount }];
+    const tokenTotal = aiLogs.reduce((a:any,b:any)=>a+(b.tokens||0),0);
+    return [...dbStats, { db: 'Gemini calls', avg: aiAvg, count: aiCount, tokens: tokenTotal }];
   }, []);
 
   const prismaCounts: PrismaCounts = useMemo(() => {
@@ -264,7 +265,7 @@ ${citations}
             <h3 className="text-lg font-semibold">Diagnostics</h3>
             <ul className="mt-2 text-sm list-disc pl-6">
               {diagnostics.map(d => (
-                <li key={d.db}>{d.db}: avg {d.avg.toFixed(0)} ms{d.count !== undefined ? ` (${d.count} calls)` : ''}</li>
+                <li key={d.db}>{d.db}: avg {d.avg.toFixed(0)} ms{d.count !== undefined ? ` (${d.count} calls)` : ''}{d.tokens !== undefined ? `, ${d.tokens} tokens` : ''}</li>
               ))}
             </ul>
           </div>

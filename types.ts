@@ -29,6 +29,7 @@ export interface ProjectDetails {
   description: string;
   searchTerms: string;
   queryVariants: string[];
+  analysisFocus?: string;
   useUnpaywall?: boolean;
   useOpenAlt?: boolean;
   searchProfiles?: SearchProfile[];
@@ -130,6 +131,7 @@ export interface GeminiLogEntry {
     paperId?: string;
     ms?: number;
     error?: string;
+    tokens?: number;
 }
 
 export interface PrismaCounts {

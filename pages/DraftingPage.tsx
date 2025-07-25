@@ -39,7 +39,7 @@ const DraftingPage: React.FC<DraftingPageProps> = ({ summaries, draft, setDraft,
     }
 
     try {
-      const newContent = await generateDraftSection(section, content, model);
+      const newContent = await generateDraftSection(section, content, model, projectDetails.analysisFocus);
       setDraft(prev => ({...prev, [section]: newContent}));
     } catch (error) {
         console.error(`Failed to generate ${section}`, error);
