@@ -1,0 +1,1 @@
+To deploy on Hugging Face Spaces, set the `GEMINI_API_KEY` secret in the Space settings. This key is required for the server proxy to communicate with Google's Gemini embeddings API (https://ai.google.dev/gemini-api/docs/embeddings).

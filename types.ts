@@ -102,3 +102,5 @@ export interface PrismaCounts {
     fullTextExcluded: number;
     studiesIncluded: number;
 }
+
+export type GeminiEmbedding = number[];
