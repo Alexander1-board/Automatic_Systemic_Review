@@ -18,6 +18,8 @@ This contains everything you need to run your app locally.
 - The AI suggests relevant databases (PubMed, Crossref, OpenAlex, ERIC, BASE, NASA ADS, DataCite, WHO GIM/LILACS, DBLP, etc.). You can adjust this list before running the search.
 - "Testing mode" limits results to 10 per source after deduplication (hover for details).
 - Keyboard shortcuts during screening: **K** to keep, **E** to exclude, **Enter** to advance.
-- The app periodically saves a snapshot locally so crashes can be recovered.
+- The app periodically saves a snapshot locally so crashes can be recovered. A
+  **Resume Previous Session** button will appear on the welcome page if data is
+  available.
 - Use `VITE_USE_WORKERS=true npm run dev` in development to enable workers.
 - If workers fail to start, the app will automatically process AI screening on the main thread.

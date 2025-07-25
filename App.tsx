@@ -41,18 +41,25 @@ export default function App() {
     [DraftSection.ABSTRACT]: '',
   });
 
-  // restore snapshot
+  const [hasSnapshot, setHasSnapshot] = useState(false);
+
+  // detect saved snapshot but don't auto restore
   useEffect(() => {
-    const snap = localStorage.getItem('snapshot');
-    if (snap) {
-      try {
-        const data = JSON.parse(snap);
-        setProjectDetails(data.projectDetails || projectDetails);
-        setPapers(data.papers || []);
-        setCurrentStep(data.currentStep || AppStep.SETUP);
-      } catch {}
+    if (localStorage.getItem('snapshot')) {
+      setHasSnapshot(true);
     }
   }, []);
+
+  const restoreSnapshot = () => {
+    const snap = localStorage.getItem('snapshot');
+    if (!snap) return;
+    try {
+      const data = JSON.parse(snap);
+      setProjectDetails(data.projectDetails || projectDetails);
+      setPapers(data.papers || []);
+      setCurrentStep(data.currentStep || AppStep.SETUP);
+    } catch {}
+  };
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -99,7 +106,15 @@ export default function App() {
   const renderStep = () => {
     switch (currentStep) {
       case AppStep.SETUP:
-        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} testing={testing} setTesting={setTesting} />;
+        return <SetupPage
+          onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)}
+          onResume={restoreSnapshot}
+          hasSnapshot={hasSnapshot}
+          model={model}
+          setModel={setModel}
+          testing={testing}
+          setTesting={setTesting}
+        />;
       case AppStep.PROJECT_DEFINITION:
         return <ProjectPage
             projectDetails={projectDetails}
@@ -122,7 +137,15 @@ export default function App() {
       case AppStep.EXPORT:
         return <ExportPage papers={papers} searchLog={searchLog} draft={draft} projectTitle={projectDetails.title} onBack={handleBack} model={model} duplicateCount={duplicateCount} />;
       default:
-        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} testing={testing} setTesting={setTesting} />;
+        return <SetupPage
+          onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)}
+          onResume={restoreSnapshot}
+          hasSnapshot={hasSnapshot}
+          model={model}
+          setModel={setModel}
+          testing={testing}
+          setTesting={setTesting}
+        />;
     }
   };
 

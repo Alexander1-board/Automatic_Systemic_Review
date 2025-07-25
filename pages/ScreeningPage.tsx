@@ -102,17 +102,9 @@ const ScreeningPage: React.FC<ScreeningPageProps> = ({ papers, setPapers, projec
   }, [projectDetails, model, papers.length]);
 
   useEffect(() => {
-      if (!hasStarted || isPaused || isLoading) return;
-      const decisionField = getDecisionField(currentStage);
-      const requiresClassification = papers.some(p => {
-          if (currentStage === 'title') return !p[decisionField];
-          const prevStageDecision = p[getDecisionField(STAGES[STAGES.indexOf(currentStage) - 1])];
-          return prevStageDecision === ScreeningDecision.KEEP && !p[decisionField];
-      });
-      if (requiresClassification) {
-        classifyAllPapersForStage(currentStage);
-      }
-  }, [hasStarted, isPaused, isLoading, currentStage, papers, classifyAllPapersForStage]);
+      if (!hasStarted || isPaused) return;
+      classifyAllPapersForStage(currentStage);
+  }, [hasStarted, isPaused, currentStage, classifyAllPapersForStage]);
   
   const handleDecisionChange = async (paperId: string, decision: ScreeningDecision) => {
     // Optimistically update the UI
