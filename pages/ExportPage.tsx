@@ -102,33 +102,52 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
     }
   }, [papers, citationStyle, model]);
   
-  const downloadAsPDF = () => {
+  const createPdfDoc = () => {
     const doc = new jsPDF();
-    const lines = fullText.split('\n');
-    let y = 10;
-    lines.forEach(line => {
-      const parts = doc.splitTextToSize(line, 180);
-      parts.forEach(t => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text(projectTitle, 10, 20);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    let y = 30;
+    sections.forEach(sec => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      if (y > 280) { doc.addPage(); y = 20; }
+      doc.text(sec, 10, y);
+      y += 8;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      const lines = doc.splitTextToSize(draft[sec] || '', 180);
+      lines.forEach(t => {
+        if (y > 280) { doc.addPage(); y = 20; }
         doc.text(t, 10, y);
         y += 7;
-        if (y > 280) { doc.addPage(); y = 10; }
       });
+      y += 4;
     });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    if (y > 280) { doc.addPage(); y = 20; }
+    doc.text('References', 10, y);
+    y += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.splitTextToSize(citations || '', 180).forEach(t => {
+      if (y > 280) { doc.addPage(); y = 20; }
+      doc.text(t, 10, y);
+      y += 7;
+    });
+    return doc;
+  };
+
+  const downloadAsPDF = () => {
+    const doc = createPdfDoc();
     doc.save(`${projectTitle.replace(/\s+/g, '_')}_review.pdf`);
   };
 
   const generatePdfBlob = () => {
-    const doc = new jsPDF();
-    const lines = fullText.split('\n');
-    let y = 10;
-    lines.forEach(line => {
-      const parts = doc.splitTextToSize(line, 180);
-      parts.forEach(t => {
-        doc.text(t, 10, y);
-        y += 7;
-        if (y > 280) { doc.addPage(); y = 10; }
-      });
-    });
+    const doc = createPdfDoc();
     return doc.output('blob');
   };
 
@@ -269,9 +288,9 @@ const ExportPage: React.FC<ExportPageProps> = ({ papers, searchLog, draft, proje
               <h3 className="text-lg font-semibold">Download</h3>
               <p className="text-sm text-slate-500 dark:text-primary-400 mt-1">Download the complete review.</p>
               <button onClick={downloadAsPDF} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                  Download PDF
+                  Download Report as PDF
               </button>
-              <button onClick={downloadZip} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">Download ZIP with PDFs</button>
+              <button onClick={downloadZip} className="mt-3 w-full inline-flex justify-center items-center px-4 py-2 border border-slate-300 dark:border-primary-700 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-primary-200 bg-white dark:bg-primary-800 hover:bg-slate-50 dark:hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">Download ZIP with Full Text PDFs</button>
               <label className="mt-2 flex items-center text-sm">
                 <input type="checkbox" className="mr-2" checked={autoExport} onChange={e => setAutoExport(e.target.checked)} /> Auto-export on finish
               </label>
