@@ -22,9 +22,21 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
   const [loadingMessage, setLoadingMessage] = useState('');
   const [strategyDeveloped, setStrategyDeveloped] = useState(false);
   const [recommendedDatabases, setRecommendedDatabases] = useState<string[]>([]);
+  const [newVariant, setNewVariant] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setProjectDetails(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleAddVariant = () => {
+    const v = newVariant.trim();
+    if (!v) return;
+    setProjectDetails(prev => ({ ...prev, queryVariants: [...prev.queryVariants, v] }));
+    setNewVariant('');
+  };
+
+  const handleRemoveVariant = (variant: string) => {
+    setProjectDetails(prev => ({ ...prev, queryVariants: prev.queryVariants.filter(v => v !== variant) }));
   };
 
   const handleDevelopStrategy = async () => {
@@ -110,6 +122,32 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ projectDetails, setProjectDet
             <label htmlFor="searchTerms" className="block text-sm font-medium text-slate-700 dark:text-primary-300">Boolean Term Suggestions</label>
             <textarea name="searchTerms" id="searchTerms" rows={4} value={projectDetails.searchTerms} onChange={handleChange} disabled={strategyDeveloped} className="mt-1 block w-full rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 font-mono text-sm disabled:bg-slate-100 dark:disabled:bg-primary-800/50" placeholder='e.g. ("myocardial infarction" OR "heart attack") AND (prevention OR therapy)'></textarea>
             {strategyDeveloped && <p className="mt-1 text-xs text-slate-500 dark:text-primary-400">Query has been finalized by the AI. To change it, you must go back and restart this step.</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-primary-300">Query Variants & Synonyms</label>
+            <div className="mt-1 flex gap-2">
+              <input
+                type="text"
+                value={newVariant}
+                onChange={e => setNewVariant(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddVariant(); } }}
+                className="flex-grow rounded-md border-slate-300 dark:bg-primary-800 dark:border-primary-700 shadow-sm focus:ring-primary-500 focus:border-primary-500 text-sm"
+                placeholder="Add variant"
+              />
+              <button type="button" onClick={handleAddVariant} className="px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md text-sm">Add</button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {projectDetails.queryVariants.map(v => (
+                <span key={v} className="inline-flex items-center px-2 py-1 rounded-full bg-primary-100 dark:bg-primary-800 text-primary-800 dark:text-primary-200 text-xs">
+                  {v}
+                  <button type="button" onClick={() => handleRemoveVariant(v)} className="ml-1 text-primary-600 hover:text-primary-800 dark:text-primary-400">&times;</button>
+                </span>
+              ))}
+              {projectDetails.queryVariants.length === 0 && (
+                <span className="text-slate-400 dark:text-primary-500 text-sm italic">No variants added.</span>
+              )}
+            </div>
           </div>
 
           {strategyDeveloped && (

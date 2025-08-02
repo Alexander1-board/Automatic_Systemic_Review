@@ -1,14 +1,40 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ProjectDetails, Paper, Summary, DraftSection, CitationStyle, ExclusionReason } from '../types';
 
-if (!process.env.API_KEY) {
+if (!process.env.GEMINI_API_KEY) {
   // In a real app, you'd want to handle this more gracefully.
   // For this sandboxed environment, we assume it's available.
-  console.warn("API_KEY environment variable not set. Using a placeholder.");
-  process.env.API_KEY = "YOUR_API_KEY_HERE";
+  console.warn("GEMINI_API_KEY environment variable not set. Using a placeholder.");
+  process.env.GEMINI_API_KEY = "YOUR_API_KEY_HERE";
 }
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+const EMBEDDING_MODEL = 'text-embedding-004';
+
+const cleanText = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const embedText = async (text: string): Promise<number[]> => {
+  const resp = await ai.models.embedContent({ model: EMBEDDING_MODEL, contents: [text] });
+  return resp.embeddings?.[0]?.values || [];
+};
+
+const dot = (a: number[], b: number[]) => a.reduce((sum, v, i) => sum + v * (b[i] || 0), 0);
+const magnitude = (a: number[]) => Math.sqrt(a.reduce((sum, v) => sum + v * v, 0));
+const cosineSim = (a: number[], b: number[]) => {
+  const denom = magnitude(a) * magnitude(b);
+  return denom === 0 ? 0 : dot(a, b) / denom;
+};
+
+const labelEmbeddingsPromise = Promise.all([
+  embedText('keep'),
+  embedText('exclude')
+]);
 
 const classificationSchema = {
     type: Type.OBJECT,
@@ -57,31 +83,28 @@ const strategySchema = {
 };
 
 
-export const classifyPaperPart = async (part: 'title' | 'abstract' | 'full-text', content: string, projectDetails: ProjectDetails, modelName: string) => {
-    const prompt = `
-        A systematic review is being conducted with the title "${projectDetails.title}".
-        The goal is: "${projectDetails.description}".
-        
-        Based on this goal, analyze the following paper's ${part}:
-        ---
-        ${content}
-        ---
-        Should this paper be included or excluded? Provide a confidence score and a brief justification.
-    `;
-
+export const classifyPaperPart = async (
+    part: 'title' | 'abstract' | 'full-text',
+    content: string,
+    _projectDetails: ProjectDetails,
+    _modelName: string,
+    threshold: number
+) => {
     try {
-        const response = await ai.models.generateContent({
-            model: modelName,
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: classificationSchema,
-            }
-        });
-        const jsonText = response.text.trim();
-        return JSON.parse(jsonText);
+        const [keepEmb, excludeEmb] = await labelEmbeddingsPromise;
+        const textEmb = await embedText(cleanText(content));
+
+        const keepSim = cosineSim(textEmb, keepEmb);
+        const excludeSim = cosineSim(textEmb, excludeEmb);
+        const score = keepSim - excludeSim;
+
+        return {
+            decision: score >= threshold ? 'keep' as const : 'exclude' as const,
+            confidence: Math.round(Math.abs(score) * 100),
+            justification: `similarity keep ${keepSim.toFixed(2)} exclude ${excludeSim.toFixed(2)}`
+        };
     } catch (error) {
-        console.error(`Error classifying paper ${part}:`, error);
+        console.error(`Error classifying paper ${part} via embeddings:`, error);
         return { decision: 'exclude', confidence: 0, justification: 'Error during analysis.' };
     }
 };

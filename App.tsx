@@ -13,6 +13,7 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [currentStep, setCurrentStep] = useState<AppStep>(AppStep.SETUP);
   const [model, setModel] = useState<string>('gemini-2.5-pro');
+  const [threshold, setThreshold] = useState<number>(0.05);
   
   const [projectDetails, setProjectDetails] = useState<ProjectDetails>({
     title: '',
@@ -71,7 +72,7 @@ export default function App() {
   const renderStep = () => {
     switch (currentStep) {
       case AppStep.SETUP:
-        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} />;
+        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} threshold={threshold} setThreshold={setThreshold} />;
       case AppStep.PROJECT_DEFINITION:
         return <ProjectPage 
             projectDetails={projectDetails} 
@@ -85,7 +86,7 @@ export default function App() {
             searchLog={searchLog}
         />;
       case AppStep.SCREENING:
-        return <ScreeningPage papers={papers} setPapers={setPapers} projectDetails={projectDetails} onComplete={() => setCurrentStep(AppStep.SUMMARY_GENERATION)} onBack={handleBack} model={model} />;
+        return <ScreeningPage papers={papers} setPapers={setPapers} projectDetails={projectDetails} onComplete={() => setCurrentStep(AppStep.SUMMARY_GENERATION)} onBack={handleBack} model={model} threshold={threshold} />;
       case AppStep.SUMMARY_GENERATION:
         return <SummaryPage papers={keptPapers} summaries={summaries} setSummaries={setSummaries} onComplete={() => setCurrentStep(AppStep.DRAFTING)} onBack={handleBack} model={model} />;
       case AppStep.DRAFTING:
@@ -93,7 +94,7 @@ export default function App() {
       case AppStep.EXPORT:
         return <ExportPage papers={papers} searchLog={searchLog} draft={draft} projectTitle={projectDetails.title} onBack={handleBack} model={model} duplicateCount={duplicateCount} />;
       default:
-        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} />;
+        return <SetupPage onComplete={() => setCurrentStep(AppStep.PROJECT_DEFINITION)} model={model} setModel={setModel} threshold={threshold} setThreshold={setThreshold} />;
     }
   };
 
@@ -102,7 +103,7 @@ export default function App() {
       <header className="bg-white dark:bg-primary-900/50 backdrop-blur-sm border-b border-slate-200 dark:border-primary-700 sticky top-0 z-30">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <h1 className="text-xl font-bold text-primary-700 dark:text-primary-400">AutoReview</h1>
+            <h1 className="text-xl font-bold text-primary-700 dark:text-primary-400">Systematic Review Automator</h1>
             <button
               onClick={toggleTheme}
               className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-primary-800 text-slate-500 dark:text-primary-400"
